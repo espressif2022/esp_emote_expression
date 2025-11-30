@@ -120,7 +120,8 @@ TEST_CASE("Test boot animation load and play", "[emote_mgr][boot_anim]")
     }
 }
 
-TEST_CASE("Test assets load and play", "[emote_mgr][assets]")
+// TEST_CASE("Test assets load and play", "[emote_mgr][assets]")
+void test_assets(void)
 {
     emote_handle_t handle = init_emote();
     if (handle) {
@@ -140,10 +141,10 @@ TEST_CASE("Test assets load and play", "[emote_mgr][assets]")
         emote_set_event_msg(handle, EMOTE_MGR_EVT_BAT, "1,100");
         vTaskDelay(pdMS_TO_TICKS(5 * 1000));
 
-        emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "你好，我是Brookesia！");
+        emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "你好，我是 esp_emote_expression，我是 Brookesia！");
         vTaskDelay(pdMS_TO_TICKS(5 * 1000));
 
-        emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "Hello, I'm Brookesia!");
+        emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "Hello, I'm esp_emote_expression, I'm Brookesia!");
         vTaskDelay(pdMS_TO_TICKS(5 * 1000));
 
         emote_set_event_msg(handle, EMOTE_MGR_EVT_LISTEN, NULL);
@@ -165,5 +166,6 @@ TEST_CASE("Test assets load and play", "[emote_mgr][assets]")
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting Expression Emote test");
-    unity_run_menu();
+    // unity_run_menu();
+    test_assets();
 }

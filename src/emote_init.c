@@ -221,4 +221,3 @@ bool emote_is_initialized(emote_handle_t handle)
 {
     return handle && handle->is_initialized;
 }
-

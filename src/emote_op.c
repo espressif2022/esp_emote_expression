@@ -561,4 +561,3 @@ bool emote_notify_flush_finished(emote_handle_t handle)
     }
     return false;
 }
-

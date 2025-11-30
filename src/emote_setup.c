@@ -34,6 +34,22 @@ typedef struct {
     obj_configurator_t configurator;
 } obj_creation_entry_t;
 
+// Helper functions
+typedef struct {
+    const char *name;
+    int value;
+} align_map_t;
+
+typedef struct {
+    const char *name;
+    gfx_text_align_t value;
+} text_align_map_t;
+
+typedef struct {
+    const char *name;
+    gfx_label_long_mode_t value;
+} long_mode_map_t;
+
 // Forward declarations for object creators
 static gfx_obj_t *emote_create_anim_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 static gfx_obj_t *emote_create_img_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
@@ -49,75 +65,40 @@ static void emote_config_label_toast_obj(gfx_obj_t *obj);
 static void emote_config_label_clock_obj(gfx_obj_t *obj);
 static void emote_config_label_battery_obj(gfx_obj_t *obj);
 
-// Helper functions
 static int emote_convert_align_str(const char *str)
 {
     if (!str) {
         return GFX_ALIGN_DEFAULT;
     }
 
-    if (strcmp(str, "GFX_ALIGN_TOP_LEFT") == 0) {
-        return GFX_ALIGN_TOP_LEFT;
-    }
-    if (strcmp(str, "GFX_ALIGN_TOP_MID") == 0) {
-        return GFX_ALIGN_TOP_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_TOP_RIGHT") == 0) {
-        return GFX_ALIGN_TOP_RIGHT;
-    }
-    if (strcmp(str, "GFX_ALIGN_LEFT_MID") == 0) {
-        return GFX_ALIGN_LEFT_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_CENTER") == 0) {
-        return GFX_ALIGN_CENTER;
-    }
-    if (strcmp(str, "GFX_ALIGN_RIGHT_MID") == 0) {
-        return GFX_ALIGN_RIGHT_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_BOTTOM_LEFT") == 0) {
-        return GFX_ALIGN_BOTTOM_LEFT;
-    }
-    if (strcmp(str, "GFX_ALIGN_BOTTOM_MID") == 0) {
-        return GFX_ALIGN_BOTTOM_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_BOTTOM_RIGHT") == 0) {
-        return GFX_ALIGN_BOTTOM_RIGHT;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_TOP_LEFT") == 0) {
-        return GFX_ALIGN_OUT_TOP_LEFT;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_TOP_MID") == 0) {
-        return GFX_ALIGN_OUT_TOP_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_TOP_RIGHT") == 0) {
-        return GFX_ALIGN_OUT_TOP_RIGHT;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_LEFT_TOP") == 0) {
-        return GFX_ALIGN_OUT_LEFT_TOP;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_LEFT_MID") == 0) {
-        return GFX_ALIGN_OUT_LEFT_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_LEFT_BOTTOM") == 0) {
-        return GFX_ALIGN_OUT_LEFT_BOTTOM;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_RIGHT_TOP") == 0) {
-        return GFX_ALIGN_OUT_RIGHT_TOP;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_RIGHT_MID") == 0) {
-        return GFX_ALIGN_OUT_RIGHT_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_RIGHT_BOTTOM") == 0) {
-        return GFX_ALIGN_OUT_RIGHT_BOTTOM;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_BOTTOM_LEFT") == 0) {
-        return GFX_ALIGN_OUT_BOTTOM_LEFT;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_BOTTOM_MID") == 0) {
-        return GFX_ALIGN_OUT_BOTTOM_MID;
-    }
-    if (strcmp(str, "GFX_ALIGN_OUT_BOTTOM_RIGHT") == 0) {
-        return GFX_ALIGN_OUT_BOTTOM_RIGHT;
+    static const align_map_t align_map[] = {
+        { "GFX_ALIGN_TOP_LEFT", GFX_ALIGN_TOP_LEFT },
+        { "GFX_ALIGN_TOP_MID", GFX_ALIGN_TOP_MID },
+        { "GFX_ALIGN_TOP_RIGHT", GFX_ALIGN_TOP_RIGHT },
+        { "GFX_ALIGN_LEFT_MID", GFX_ALIGN_LEFT_MID },
+        { "GFX_ALIGN_CENTER", GFX_ALIGN_CENTER },
+        { "GFX_ALIGN_RIGHT_MID", GFX_ALIGN_RIGHT_MID },
+        { "GFX_ALIGN_BOTTOM_LEFT", GFX_ALIGN_BOTTOM_LEFT },
+        { "GFX_ALIGN_BOTTOM_MID", GFX_ALIGN_BOTTOM_MID },
+        { "GFX_ALIGN_BOTTOM_RIGHT", GFX_ALIGN_BOTTOM_RIGHT },
+        { "GFX_ALIGN_OUT_TOP_LEFT", GFX_ALIGN_OUT_TOP_LEFT },
+        { "GFX_ALIGN_OUT_TOP_MID", GFX_ALIGN_OUT_TOP_MID },
+        { "GFX_ALIGN_OUT_TOP_RIGHT", GFX_ALIGN_OUT_TOP_RIGHT },
+        { "GFX_ALIGN_OUT_LEFT_TOP", GFX_ALIGN_OUT_LEFT_TOP },
+        { "GFX_ALIGN_OUT_LEFT_MID", GFX_ALIGN_OUT_LEFT_MID },
+        { "GFX_ALIGN_OUT_LEFT_BOTTOM", GFX_ALIGN_OUT_LEFT_BOTTOM },
+        { "GFX_ALIGN_OUT_RIGHT_TOP", GFX_ALIGN_OUT_RIGHT_TOP },
+        { "GFX_ALIGN_OUT_RIGHT_MID", GFX_ALIGN_OUT_RIGHT_MID },
+        { "GFX_ALIGN_OUT_RIGHT_BOTTOM", GFX_ALIGN_OUT_RIGHT_BOTTOM },
+        { "GFX_ALIGN_OUT_BOTTOM_LEFT", GFX_ALIGN_OUT_BOTTOM_LEFT },
+        { "GFX_ALIGN_OUT_BOTTOM_MID", GFX_ALIGN_OUT_BOTTOM_MID },
+        { "GFX_ALIGN_OUT_BOTTOM_RIGHT", GFX_ALIGN_OUT_BOTTOM_RIGHT },
+    };
+
+    for (size_t i = 0; i < sizeof(align_map) / sizeof(align_map[0]); i++) {
+        if (strcmp(str, align_map[i].name) == 0) {
+            return align_map[i].value;
+        }
     }
 
     return GFX_ALIGN_DEFAULT;
@@ -129,15 +110,17 @@ static gfx_text_align_t emote_convert_text_align_str(const char *str)
         return GFX_TEXT_ALIGN_CENTER;
     }
 
-    // Match short form strings
-    if (strcmp(str, "left") == 0) {
-        return GFX_TEXT_ALIGN_LEFT;
-    }
-    if (strcmp(str, "center") == 0) {
-        return GFX_TEXT_ALIGN_CENTER;
-    }
-    if (strcmp(str, "right") == 0) {
-        return GFX_TEXT_ALIGN_RIGHT;
+    static const text_align_map_t text_align_map[] = {
+        { "GFX_TEXT_ALIGN_AUTO", GFX_TEXT_ALIGN_AUTO },
+        { "GFX_TEXT_ALIGN_LEFT", GFX_TEXT_ALIGN_LEFT },
+        { "GFX_TEXT_ALIGN_CENTER", GFX_TEXT_ALIGN_CENTER },
+        { "GFX_TEXT_ALIGN_RIGHT", GFX_TEXT_ALIGN_RIGHT },
+    };
+
+    for (size_t i = 0; i < sizeof(text_align_map) / sizeof(text_align_map[0]); i++) {
+        if (strcmp(str, text_align_map[i].name) == 0) {
+            return text_align_map[i].value;
+        }
     }
 
     return GFX_TEXT_ALIGN_CENTER;
@@ -149,18 +132,17 @@ static gfx_label_long_mode_t emote_convert_long_mode_str(const char *str)
         return GFX_LABEL_LONG_CLIP;
     }
 
-    // Match short form strings
-    if (strcmp(str, "wrap") == 0) {
-        return GFX_LABEL_LONG_WRAP;
-    }
-    if (strcmp(str, "scroll") == 0) {
-        return GFX_LABEL_LONG_SCROLL;
-    }
-    if (strcmp(str, "clip") == 0) {
-        return GFX_LABEL_LONG_CLIP;
-    }
-    if (strcmp(str, "scroll_snap") == 0) {
-        return GFX_LABEL_LONG_SCROLL_SNAP;
+    static const long_mode_map_t long_mode_map[] = {
+        { "GFX_LABEL_LONG_WRAP", GFX_LABEL_LONG_WRAP },
+        { "GFX_LABEL_LONG_SCROLL", GFX_LABEL_LONG_SCROLL },
+        { "GFX_LABEL_LONG_CLIP", GFX_LABEL_LONG_CLIP },
+        { "GFX_LABEL_LONG_SNAP", GFX_LABEL_LONG_SCROLL_SNAP },
+    };
+
+    for (size_t i = 0; i < sizeof(long_mode_map) / sizeof(long_mode_map[0]); i++) {
+        if (strcmp(str, long_mode_map[i].name) == 0) {
+            return long_mode_map[i].value;
+        }
     }
 
     return GFX_LABEL_LONG_CLIP;
@@ -518,6 +500,8 @@ bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *la
     int longModeSpeed = EMOTE_DEFAULT_SCROLL_SPEED;
     int longModeSnapInterval = 1500;
 
+
+
     cJSON *labelObj = cJSON_GetObjectItem(layout, "label");
     if (cJSON_IsObject(labelObj)) {
         cJSON *colorJson = cJSON_GetObjectItem(labelObj, "color");
@@ -574,7 +558,7 @@ bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *la
     if (strcmp(longModeType, "GFX_LABEL_LONG_SCROLL") == 0) {
         gfx_label_set_scroll_speed(obj, longModeSpeed);
         gfx_label_set_scroll_loop(obj, longModeLoop);
-    } else if (strcmp(longModeType, "GFX_LABEL_LONG_SCROLL_SNAP") == 0) {
+    } else if (strcmp(longModeType, "GFX_LABEL_LONG_SNAP") == 0) {
         gfx_label_set_snap_loop(obj, longModeLoop);
         gfx_label_set_snap_interval(obj, longModeSnapInterval);
     }
@@ -631,7 +615,7 @@ bool emote_apply_fonts(emote_handle_t handle, const uint8_t *fontData)
         return false;
     }
 
-    handle->gfx_font = gfx_font_lv_create_from_binary((uint8_t *)fontData);
+    handle->gfx_font = gfx_font_lv_load_from_binary((uint8_t *)fontData);
     if (!handle->gfx_font) {
         ESP_LOGE(TAG, "Failed to create font");
         return false;

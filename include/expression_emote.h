@@ -5,5 +5,4 @@
  */
 #pragma once
 
-#include "expression_emote/macro_configs.h"
 #include "expression_emote/emote.h"

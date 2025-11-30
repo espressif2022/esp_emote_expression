@@ -240,7 +240,7 @@ static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *
     }
 
 
-    for(int i =0; i<num; i++) {
+    for (int i = 0; i < num; i++) {
         const char *name = mmap_assets_get_name(*target_handle, i);
         ESP_LOGI(TAG, "Found file: %d, %s", i, name);
     }
@@ -553,4 +553,3 @@ bool emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *da
 
     return emote_load_assets_data(handle, handle->emote_assets_handle);
 }
-
