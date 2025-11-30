@@ -1,0 +1,31 @@
+version: "0.0.1"
+license: "Apache-2.0"
+description: ESP-Brookesia-Expression-Emote is a component for managing expression emotes in ESP-Brookesia.
+url: "https://github.com/espressif2022/esp_emote_expression"
+repository: "https://github.com/espressif2022/esp_emote_expression.git"
+documentation: "https://github.com/espressif2022/esp_emote_expression"
+issues: "https://github.com/espressif2022/esp_emote_expression/issues"
+
+dependencies:
+  idf:
+    version: '>=5.0'
+
+  # Utilities
+  espressif/cmake_utilities:
+    version: "0.*"
+    public: true
+
+  espressif/esp_mmap_assets:
+    version: '1.*'
+    public: true
+
+  espressif2022/esp_emote_gfx:
+    version: '*'
+    override_path: /home/xx/esp/esp_emote_gfx
+    # git: https://github.com/espressif2022/esp_emote_gfx.git
+    # version: "feat/update_fps"
+    public: true
+
+  espressif2022/esp_emote_assets:
+    version: '*'
+    override_path: /home/xx/esp/esp_emote_assets
