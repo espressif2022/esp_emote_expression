@@ -137,6 +137,20 @@ bool emote_set_label_clock(emote_handle_t handle);
  */
 bool emote_set_bat_status(emote_handle_t handle);
 
+// ===== Generic Object Management API =====
+/**
+ * @brief  Register an externally created object
+ *
+ * @param[in]  handle  Emote handle
+ * @param[in]  name    Object name (must be unique, not conflict with predefined names)
+ * @param[in]  obj     Object pointer
+ *
+ * @return
+ *       - true   On success
+ *       - false  On failure (name conflict or invalid parameters)
+ */
+bool emote_register_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj);
+
 #ifdef __cplusplus
 }
 #endif

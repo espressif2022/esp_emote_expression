@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -33,6 +35,13 @@ typedef struct {
     obj_creator_t creator;
     obj_configurator_t configurator;
 } obj_creation_entry_t;
+
+// Type string to creator mapping (for generic object creation)
+typedef struct {
+    const char *type_str;
+    obj_creator_t creator;
+    obj_configurator_t configurator;
+} obj_type_str_entry_t;
 
 // Helper functions
 typedef struct {
@@ -66,6 +75,7 @@ static gfx_obj_t *emote_create_timer_obj(gfx_handle_t gfx_handle, emote_handle_t
 static void emote_config_anim_obj(gfx_obj_t *obj);
 static void emote_config_img_obj(gfx_obj_t *obj);
 static void emote_config_qrcode_obj(gfx_obj_t *obj);
+static void emote_config_label_obj(gfx_obj_t *obj);
 static void emote_config_label_toast_obj(gfx_obj_t *obj);
 static void emote_config_label_clock_obj(gfx_obj_t *obj);
 static void emote_config_label_battery_obj(gfx_obj_t *obj);
@@ -221,6 +231,18 @@ static gfx_obj_t *emote_create_timer_obj(gfx_handle_t gfx_handle, emote_handle_t
     return (gfx_obj_t *)gfx_timer_create(gfx_handle, emote_status_timer_callback, 1000, handle);
 }
 
+// Type string to creator mapping table
+static const obj_type_str_entry_t obj_type_str_table[] = {
+    { "anim",    emote_create_anim_obj,  emote_config_anim_obj  },
+    { "image",   emote_create_img_obj,   emote_config_img_obj   },
+    { "img",     emote_create_img_obj,   emote_config_img_obj   },
+    { "label",   emote_create_label_obj, emote_config_label_obj },
+    { "qrcode",  emote_create_qrcode_obj, emote_config_qrcode_obj },
+    { "timer",   emote_create_timer_obj, NULL                   },
+};
+
+#define OBJ_TYPE_STR_TABLE_SIZE (sizeof(obj_type_str_table) / sizeof(obj_type_str_table[0]))
+
 // ===== Object Configurator Implementations =====
 static void emote_config_anim_obj(gfx_obj_t *obj)
 {
@@ -243,6 +265,25 @@ static void emote_config_qrcode_obj(gfx_obj_t *obj)
         // gfx_qrcode_set_size(obj, 150);
         gfx_obj_set_visible(obj, false);
     }
+}
+
+static void emote_config_label_obj(gfx_obj_t *obj)
+{
+    if (!obj) {
+        return;
+    }
+
+    // Set default label properties
+    gfx_obj_set_size(obj, EMOTE_DEFAULT_LABEL_WIDTH, EMOTE_DEFAULT_LABEL_HEIGHT);
+    gfx_label_set_text(obj, "");
+    gfx_label_set_color(obj, GFX_COLOR_HEX(EMOTE_DEFAULT_FONT_COLOR));
+    gfx_label_set_text_align(obj, GFX_TEXT_ALIGN_CENTER);
+    gfx_label_set_long_mode(obj, GFX_LABEL_LONG_SCROLL);
+    gfx_label_set_scroll_speed(obj, EMOTE_DEFAULT_SCROLL_SPEED);
+    gfx_label_set_scroll_loop(obj, true);
+    // Use default font size 26
+    gfx_label_set_font(obj, (void *)&font_maison_neue_book_26);
+    gfx_obj_set_visible(obj, true);
 }
 
 static void emote_config_label_toast_obj(gfx_obj_t *obj)
@@ -360,21 +401,80 @@ static gfx_obj_t *emote_create_object(emote_handle_t handle, emote_obj_type_t ty
     return obj;
 }
 
-static gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *name)
+// Find custom object by name
+static emote_custom_obj_entry_t *emote_find_custom_obj(emote_handle_t handle, const char *name)
 {
-    ESP_LOGD(TAG, "create object by name: %s", name);
-    emote_obj_type_t type = emote_get_element_type(name);
-    if (type == EMOTE_OBJ_MAX) {
-        ESP_LOGE(TAG, "Unknown element: %s", name);
+    if (!handle || !name) {
         return NULL;
     }
 
-    gfx_obj_t *obj = handle->gfx_objects[type];
-    if (!obj) {
-        obj = emote_create_object(handle, type);
+    emote_custom_obj_entry_t *entry = handle->custom_objects;
+    while (entry) {
+        if (entry->name && strcmp(entry->name, name) == 0) {
+            return entry;
+        }
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+// Register custom object
+static bool emote_register_custom_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj)
+{
+    if (!handle || !name || !obj) {
+        return false;
     }
 
-    return obj;
+    // Check if already exists
+    if (emote_find_custom_obj(handle, name)) {
+        ESP_LOGW(TAG, "Custom object '%s' already exists", name);
+        return false;
+    }
+
+    // Create new entry
+    emote_custom_obj_entry_t *entry = (emote_custom_obj_entry_t *)calloc(1, sizeof(emote_custom_obj_entry_t));
+    if (!entry) {
+        ESP_LOGE(TAG, "Failed to allocate custom object entry");
+        return false;
+    }
+
+    entry->name = strdup(name);
+    if (!entry->name) {
+        ESP_LOGE(TAG, "Failed to duplicate name string");
+        free(entry);
+        return false;
+    }
+
+    entry->obj = obj;
+    entry->next = handle->custom_objects;
+    handle->custom_objects = entry;
+
+    ESP_LOGD(TAG, "Registered custom object: %s", name);
+    return true;
+}
+
+static gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *name)
+{
+    ESP_LOGD(TAG, "create object by name: %s", name);
+    
+    // First check predefined types
+    emote_obj_type_t type = emote_get_element_type(name);
+    if (type != EMOTE_OBJ_MAX) {
+        gfx_obj_t *obj = handle->gfx_objects[type];
+        if (!obj) {
+            obj = emote_create_object(handle, type);
+        }
+        return obj;
+    }
+
+    // Check custom objects
+    emote_custom_obj_entry_t *entry = emote_find_custom_obj(handle, name);
+    if (entry) {
+        return entry->obj;
+    }
+
+    ESP_LOGE(TAG, "Unknown element: %s", name);
+    return NULL;
 }
 
 bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *layout)
@@ -693,4 +793,103 @@ bool emote_setup_boot_anim(emote_handle_t handle, uint8_t *anim_data, size_t ani
 
     handle->boot_anim_completed = false;
     return true;
+}
+
+// ===== Public API for Generic Object Management =====
+
+gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name)
+{
+    if (!handle || !name) {
+        return NULL;
+    }
+
+    // First check predefined types
+    emote_obj_type_t type = emote_get_element_type(name);
+    if (type != EMOTE_OBJ_MAX) {
+        return handle->gfx_objects[type];
+    }
+
+    // Check custom objects
+    emote_custom_obj_entry_t *entry = emote_find_custom_obj(handle, name);
+    if (entry) {
+        return entry->obj;
+    }
+
+    return NULL;
+}
+
+gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, const char *type_str)
+{
+    if (!handle || !name || !type_str) {
+        ESP_LOGE(TAG, "Invalid parameters for emote_create_obj_by_type");
+        return NULL;
+    }
+
+    // Check if object already exists
+    gfx_obj_t *existing = emote_get_obj_by_name(handle, name);
+    if (existing) {
+        ESP_LOGW(TAG, "Object '%s' already exists", name);
+        return existing;
+    }
+
+    // Find type string in mapping table
+    const obj_type_str_entry_t *entry = NULL;
+    for (size_t i = 0; i < OBJ_TYPE_STR_TABLE_SIZE; i++) {
+        if (strcmp(obj_type_str_table[i].type_str, type_str) == 0) {
+            entry = &obj_type_str_table[i];
+            break;
+        }
+    }
+
+    if (!entry || !entry->creator) {
+        ESP_LOGE(TAG, "Unknown object type: %s", type_str);
+        return NULL;
+    }
+
+    gfx_handle_t gfx_handle = handle->gfx_emote_handle;
+    if (!gfx_handle) {
+        ESP_LOGE(TAG, "GFX handle not initialized");
+        return NULL;
+    }
+
+    gfx_emote_lock(gfx_handle);
+
+    // Create object
+    gfx_obj_t *obj = entry->creator(gfx_handle, handle);
+    if (obj && entry->configurator) {
+        entry->configurator(obj);
+    }
+
+    gfx_emote_unlock(gfx_handle);
+
+    if (obj) {
+        // Register as custom object
+        if (!emote_register_custom_obj(handle, name, obj)) {
+            ESP_LOGE(TAG, "Failed to register custom object: %s", name);
+            gfx_emote_lock(gfx_handle);
+            gfx_obj_delete(obj);
+            gfx_emote_unlock(gfx_handle);
+            return NULL;
+        }
+        ESP_LOGI(TAG, "Created custom object '%s' of type '%s'", name, type_str);
+    }
+
+    return obj;
+}
+
+bool emote_register_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj)
+{
+    if (!handle || !name || !obj) {
+        ESP_LOGE(TAG, "Invalid parameters for emote_register_obj");
+        return false;
+    }
+
+    // Check if name conflicts with predefined types
+    emote_obj_type_t type = emote_get_element_type(name);
+    if (type != EMOTE_OBJ_MAX) {
+        ESP_LOGE(TAG, "Name '%s' conflicts with predefined element", name);
+        return false;
+    }
+
+    return emote_register_custom_obj(handle, name, obj);
 }

@@ -34,12 +34,21 @@ typedef struct {
     mmap_assets_handle_t handle;
 } icon_data_t;
 
+// Custom object mapping entry (for user-defined objects)
+typedef struct emote_custom_obj_entry_s {
+    char *name;                    // Object name (dynamically allocated)
+    gfx_obj_t *obj;                // Object pointer
+    struct emote_custom_obj_entry_s *next;  // Next entry in linked list
+} emote_custom_obj_entry_t;
+
 struct emote_s {
     bool is_initialized;
 
     gfx_handle_t gfx_emote_handle;
 
     gfx_obj_t *gfx_objects[EMOTE_OBJ_MAX];
+
+    emote_custom_obj_entry_t *custom_objects;  // Linked list for custom objects
 
     lv_font_t *gfx_font;
 

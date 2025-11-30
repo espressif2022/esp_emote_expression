@@ -139,6 +139,20 @@ bool emote_deinit(emote_handle_t handle)
                 handle->gfx_objects[i] = NULL;
             }
         }
+        // Cleanup custom objects
+        emote_custom_obj_entry_t *entry = handle->custom_objects;
+        while (entry) {
+            emote_custom_obj_entry_t *next = entry->next;
+            if (entry->obj) {
+                gfx_obj_delete(entry->obj);
+            }
+            if (entry->name) {
+                free(entry->name);
+            }
+            free(entry);
+            entry = next;
+        }
+        handle->custom_objects = NULL;
         gfx_emote_unlock(handle->gfx_emote_handle);
     }
 

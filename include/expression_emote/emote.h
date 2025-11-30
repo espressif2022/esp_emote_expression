@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "gfx.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -167,6 +168,23 @@ bool emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *da
  * @return true on success, false on failure
  */
 bool emote_notify_flush_finished(emote_handle_t handle);
+
+/**
+ * @brief Get graphics object by name
+ * @param handle Handle to emote manager
+ * @param name Object name (predefined or custom)
+ * @return Pointer to gfx_obj_t on success, NULL if object not found
+ */
+gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name);
+
+/**
+ * @brief Create object by type string (for custom objects)
+ * @param handle Handle to emote manager
+ * @param name Object name (must be unique, not conflict with predefined names)
+ * @param type_str Object type string: "anim", "image"/"img", "label", "qrcode", "timer"
+ * @return Pointer to gfx_obj_t on success, NULL on failure
+ */
+gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, const char *type_str);
 
 #ifdef __cplusplus
 }
