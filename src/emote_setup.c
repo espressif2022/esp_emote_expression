@@ -50,6 +50,11 @@ typedef struct {
     gfx_label_long_mode_t value;
 } long_mode_map_t;
 
+typedef struct {
+    const char *name;
+    emote_obj_type_t value;
+} element_type_map_t;
+
 // Forward declarations for object creators
 static gfx_obj_t *emote_create_anim_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 static gfx_obj_t *emote_create_img_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
@@ -154,38 +159,24 @@ static emote_obj_type_t emote_get_element_type(const char *name)
         return EMOTE_OBJ_MAX;
     }
 
-    if (strcmp(name, EMOTE_ELEMENT_BOOT_ANIM) == 0) {
-        return EMOTE_OBJ_ANIM_BOOT;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_EYE_ANIM) == 0) {
-        return EMOTE_OBJ_ANIM_EYE;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_EMERG_DLG) == 0) {
-        return EMOTE_OBJ_ANIM_EMERG_DLG;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_TOAST_LABEL) == 0) {
-        return EMOTE_OBJ_LABEL_TOAST;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_CLOCK_LABEL) == 0) {
-        return EMOTE_OBJ_LABEL_CLOCK;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_LISTEN_ANIM) == 0) {
-        return EMOTE_OBJ_ANIM_LISTEN;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_STATUS_ICON) == 0) {
-        return EMOTE_OBJ_ICON_STATUS;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_CHARGE_ICON) == 0) {
-        return EMOTE_OBJ_ICON_CHARGE;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_BAT_LEFT_LABEL) == 0) {
-        return EMOTE_OBJ_LABEL_BATTERY;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_TIMER_STATUS) == 0) {
-        return EMOTE_OBJ_TIMER_STATUS;
-    }
-    if (strcmp(name, EMOTE_ELEMENT_QRCODE) == 0) {
-        return EMOTE_OBJ_QRCODE;
+    static const element_type_map_t element_type_map[] = {
+        { EMOTE_ELEMENT_BOOT_ANIM,      EMOTE_OBJ_ANIM_BOOT      },
+        { EMOTE_ELEMENT_EYE_ANIM,        EMOTE_OBJ_ANIM_EYE       },
+        { EMOTE_ELEMENT_EMERG_DLG,       EMOTE_OBJ_ANIM_EMERG_DLG },
+        { EMOTE_ELEMENT_TOAST_LABEL,     EMOTE_OBJ_LABEL_TOAST    },
+        { EMOTE_ELEMENT_CLOCK_LABEL,     EMOTE_OBJ_LABEL_CLOCK    },
+        { EMOTE_ELEMENT_LISTEN_ANIM,     EMOTE_OBJ_ANIM_LISTEN    },
+        { EMOTE_ELEMENT_STATUS_ICON,     EMOTE_OBJ_ICON_STATUS    },
+        { EMOTE_ELEMENT_CHARGE_ICON,     EMOTE_OBJ_ICON_CHARGE    },
+        { EMOTE_ELEMENT_BAT_LEFT_LABEL,  EMOTE_OBJ_LABEL_BATTERY  },
+        { EMOTE_ELEMENT_TIMER_STATUS,    EMOTE_OBJ_TIMER_STATUS   },
+        { EMOTE_ELEMENT_QRCODE,          EMOTE_OBJ_QRCODE         },
+    };
+
+    for (size_t i = 0; i < sizeof(element_type_map) / sizeof(element_type_map[0]); i++) {
+        if (strcmp(name, element_type_map[i].name) == 0) {
+            return element_type_map[i].value;
+        }
     }
 
     return EMOTE_OBJ_MAX;
@@ -216,9 +207,7 @@ static gfx_obj_t *emote_create_img_obj(gfx_handle_t gfx_handle, emote_handle_t h
 static gfx_obj_t *emote_create_qrcode_obj(gfx_handle_t gfx_handle, emote_handle_t handle)
 {
     (void)handle;
-    // TODO: Implement gfx_qrcode_create if not available
-    // For now, return NULL or use alternative implementation
-    return NULL;  // Placeholder - implement when gfx_qrcode API is available
+    return gfx_qrcode_create(gfx_handle);
 }
 
 static gfx_obj_t *emote_create_label_obj(gfx_handle_t gfx_handle, emote_handle_t handle)
@@ -431,16 +420,6 @@ bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *lay
     gfx_obj_set_visible(obj, false);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
-    if (strcmp(name, EMOTE_ELEMENT_EYE_ANIM) == 0) {
-        gfx_obj_t *obj_qrcode = emote_create_obj_by_name(handle, EMOTE_ELEMENT_QRCODE);
-        if (obj_qrcode) {
-            gfx_emote_lock(handle->gfx_emote_handle);
-            gfx_obj_align(obj_qrcode, GFX_ALIGN_CENTER, 0, 30);
-            gfx_obj_set_visible(obj_qrcode, false);
-            gfx_emote_unlock(handle->gfx_emote_handle);
-        }
-    }
-
     return true;
 }
 
@@ -604,6 +583,47 @@ bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *la
     gfx_timer_set_repeat_count(obj, repeat_count);
     gfx_timer_set_period(obj, period);
     gfx_timer_pause((gfx_timer_handle_t)obj);
+    gfx_emote_unlock(handle->gfx_emote_handle);
+
+    return true;
+}
+
+bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *layout)
+{
+    if (!handle || !name || !layout) {
+        return false;
+    }
+
+    cJSON *align = cJSON_GetObjectItem(layout, "align");
+    cJSON *x = cJSON_GetObjectItem(layout, "x");
+    cJSON *y = cJSON_GetObjectItem(layout, "y");
+
+    if (!cJSON_IsString(align) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
+        ESP_LOGE(TAG, "QRCode %s: missing align/x/y fields", name);
+        return false;
+    }
+
+    int size = 150;  // Default QRCode size
+    cJSON *qrcodeObj = cJSON_GetObjectItem(layout, "qrcode");
+    if (cJSON_IsObject(qrcodeObj)) {
+        cJSON *sizeJson = cJSON_GetObjectItem(qrcodeObj, "size");
+        if (cJSON_IsNumber(sizeJson)) {
+            size = sizeJson->valueint;
+        }
+    }
+
+    gfx_obj_t *obj = emote_create_obj_by_name(handle, name);
+    if (!obj) {
+        ESP_LOGE(TAG, "Failed to create qrcode: %s", name);
+        return false;
+    }
+
+    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_obj_align(obj, emote_convert_align_str(align->valuestring), x->valueint, y->valueint);
+    if (size > 0) {
+        gfx_obj_set_size(obj, size, size);
+    }
+    gfx_obj_set_visible(obj, false);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
     return true;

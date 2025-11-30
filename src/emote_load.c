@@ -399,6 +399,8 @@ static bool emote_load_layouts(emote_handle_t handle, cJSON *root)
             result = emote_apply_label_layout(handle, obj_name, layout);
         } else if (strcmp(typeStr, "timer") == 0) {
             result = emote_apply_timer_layout(handle, obj_name, layout);
+        } else if (strcmp(typeStr, "qrcode") == 0) {
+            result = emote_apply_qrcode_layout(handle, obj_name, layout);
         } else {
             ESP_LOGE(TAG, "Unknown type: %s", typeStr);
         }

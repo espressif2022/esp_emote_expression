@@ -159,6 +159,9 @@ void test_assets(void)
         emote_insert_anim_dialog(handle, "angry", 5 * 1000);
         vTaskDelay(pdMS_TO_TICKS(5 * 1000));
 
+        emote_set_qrcode_data(handle, "https://www.esp32.com");
+        vTaskDelay(pdMS_TO_TICKS(5 * 1000));
+
         cleanup_emote(handle);
     }
 }

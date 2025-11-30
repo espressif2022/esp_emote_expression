@@ -101,6 +101,19 @@ bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *ti
  */
 bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *animation);
 
+/**
+ * @brief  Apply QRCode layout configuration from JSON
+ *
+ * @param[in]  handle  Emote handle
+ * @param[in]  name    QRCode element name
+ * @param[in]  qrcode  JSON object containing QRCode configuration
+ *
+ * @return
+ *       - true   On success
+ *       - false  Fail to apply QRCode layout
+ */
+bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *qrcode);
+
 // ===== UI Operation Functions =====
 /**
  * @brief  Update clock label with current time
