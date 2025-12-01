@@ -456,7 +456,7 @@ static bool emote_register_custom_obj(emote_handle_t handle, const char *name, g
 static gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *name)
 {
     ESP_LOGD(TAG, "create object by name: %s", name);
-    
+
     // First check predefined types
     emote_obj_type_t type = emote_get_element_type(name);
     if (type != EMOTE_OBJ_MAX) {

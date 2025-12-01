@@ -161,7 +161,7 @@ void test_assets(void)
 
         emote_set_event_msg(handle, EMOTE_MGR_EVT_BAT, "1,100");
         vTaskDelay(pdMS_TO_TICKS(3 * 1000));
-        
+
         // 1. Create custom label with default properties
         // Note: emote_create_obj_by_type automatically sets default properties:
         // - Font: font_maison_neue_book_26
@@ -180,9 +180,9 @@ void test_assets(void)
             // gfx_obj_set_size(custom_label_1, 200, 30);  // Custom size
             // gfx_obj_align(custom_label_1, GFX_ALIGN_CENTER, 0, 0);  // Center alignment
         }
-        
+
         vTaskDelay(pdMS_TO_TICKS(2 * 1000));
-        
+
         // 3. Modify toast element label
         gfx_obj_t *toast_label = emote_get_obj_by_name(handle, "toast_label");
         if (toast_label) {
@@ -191,7 +191,7 @@ void test_assets(void)
         } else {
             ESP_LOGW(TAG, "toast_label not found");
         }
-        
+
         vTaskDelay(pdMS_TO_TICKS(2 * 1000));
 
         cleanup_emote(handle);

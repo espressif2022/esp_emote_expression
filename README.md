@@ -1,30 +1,30 @@
 # ESP-Emote-Expression
 
-ESP-Emote-Expression 是一个用于管理表情动画和UI显示的ESP-IDF组件，专为ESP-Brookesia项目设计。该组件提供了丰富的表情动画管理、UI元素控制和事件处理功能。
+ESP-Emote-Expression is an ESP-IDF component for managing emote animations and UI display, designed specifically for the ESP-Brookesia project. This component provides rich emote animation management, UI element control, and event handling capabilities.
 
-## 功能特性
+## Features
 
-- **表情动画管理**：支持emoji动画播放，包括眼睛表情、监听动画等
-- **启动动画**：支持自定义启动动画，可配置自动停止和删除
-- **UI元素管理**：支持标签、图像、定时器、QR码等多种UI元素
-- **事件处理**：支持多种系统事件（说话、监听、系统消息、电池状态等）
-- **对话框动画**：支持紧急对话框动画，可设置自动停止时间
-- **资源管理**：支持从文件路径或分区加载资源，使用内存映射优化性能
-- **布局配置**：支持通过JSON配置文件定义UI布局
+- **Emote Animation Management**: Supports emoji animation playback, including eye expressions, listening animations, etc.
+- **Boot Animation**: Supports custom boot animations with configurable auto-stop and deletion
+- **UI Element Management**: Supports various UI elements such as labels, images, timers, QR codes, etc.
+- **Event Handling**: Supports multiple system events (speaking, listening, system messages, battery status, etc.)
+- **Dialog Animation**: Supports urgent dialog animations with configurable auto-stop time
+- **Resource Management**: Supports loading resources from file paths or partitions, using memory mapping for performance optimization
+- **Layout Configuration**: Supports defining UI layouts through JSON configuration files
 
-## 依赖要求
+## Dependencies
 
 - ESP-IDF >= 5.0
 - `espressif/cmake_utilities` >= 0.*
 - `espressif/esp_mmap_assets` >= 1.*
-- `espressif2022/esp_emote_gfx` (图形渲染组件)
-- `espressif2022/esp_emote_assets` (资源管理组件)
+- `espressif2022/esp_emote_gfx` (Graphics rendering component)
+- `espressif2022/esp_emote_assets` (Resource management component)
 
-## 快速开始
+## Quick Start
 
-### 1. 添加组件依赖
+### 1. Add Component Dependency
 
-在你的 `idf_component.yml` 文件中添加：
+Add the following to your `idf_component.yml` file:
 
 ```yaml
 dependencies:
@@ -32,12 +32,12 @@ dependencies:
     version: "*"
 ```
 
-### 2. 初始化组件
+### 2. Initialize Component
 
 ```c
 #include "expression_emote.h"
 
-// 配置结构
+// Configuration structure
 emote_config_t config = {
     .flags = {
         .swap = true,
@@ -58,128 +58,128 @@ emote_config_t config = {
         .task_affinity = 1,
         .task_stack_in_ext = false
     },
-    .flush_cb = your_flush_callback  // 可选
+    .flush_cb = your_flush_callback  // Optional
 };
 
-// 初始化
+// Initialize
 emote_handle_t handle = emote_init(&config);
 if (handle == NULL) {
-    // 初始化失败
+    // Initialization failed
 }
 ```
 
-### 3. 加载资源
+### 3. Load Resources
 
 ```c
-// 从分区加载资源
+// Load resources from partition
 emote_data_t data = {
     .type = EMOTE_SOURCE_PARTITION,
     .source.partition_label = "assets"
 };
 
 if (!emote_load_assets_from_source(handle, &data)) {
-    // 加载失败
+    // Load failed
 }
 
-// 加载启动动画
+// Load boot animation
 if (!emote_load_boot_anim_from_source(handle, &data)) {
-    // 加载失败
+    // Load failed
 }
 ```
 
-### 4. 使用API
+### 4. Use API
 
 ```c
-// 设置emoji动画
+// Set emoji animation
 emote_set_anim_emoji(handle, "happy");
 
-// 设置事件消息
+// Set event message
 emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "Hello");
 
-// 设置QR码
+// Set QR code
 emote_set_qrcode_data(handle, "https://example.com");
 
-// 设置对话框动画（自动停止）
-emote_insert_anim_dialog(handle, "warning", 3000);  // 3秒后自动停止
+// Set dialog animation (auto-stop)
+emote_insert_anim_dialog(handle, "warning", 3000);  // Auto-stop after 3 seconds
 
-// 更新电池状态
+// Update battery status
 emote_set_bat_status(handle);
 ```
 
-## API 参考
+## API Reference
 
-### 初始化与清理
+### Initialization and Cleanup
 
-- `emote_init()` - 初始化表情管理器
-- `emote_deinit()` - 清理并释放资源
-- `emote_is_initialized()` - 检查是否已初始化
+- `emote_init()` - Initialize emote manager
+- `emote_deinit()` - Cleanup and release resources
+- `emote_is_initialized()` - Check if initialized
 
-### 资源加载
+### Resource Loading
 
-- `emote_load_assets_from_source()` - 从源加载资源
-- `emote_load_boot_anim_from_source()` - 加载启动动画
+- `emote_load_assets_from_source()` - Load resources from source
+- `emote_load_boot_anim_from_source()` - Load boot animation
 
-### 动画控制
+### Animation Control
 
-- `emote_set_anim_emoji()` - 设置emoji动画
-- `emote_set_dialog_anim()` - 设置对话框动画
-- `emote_insert_anim_dialog()` - 插入对话框动画（带自动停止）
-- `emote_stop_anim_dialog()` - 停止对话框动画
-- `emote_wait_boot_anim_stop()` - 等待启动动画完成
+- `emote_set_anim_emoji()` - Set emoji animation
+- `emote_set_dialog_anim()` - Set dialog animation
+- `emote_insert_anim_dialog()` - Insert dialog animation (with auto-stop)
+- `emote_stop_anim_dialog()` - Stop dialog animation
+- `emote_wait_boot_anim_stop()` - Wait for boot animation to complete
 
-### 事件与消息
+### Events and Messages
 
-- `emote_set_event_msg()` - 设置事件消息
-- `emote_set_qrcode_data()` - 设置QR码数据
+- `emote_set_event_msg()` - Set event message
+- `emote_set_qrcode_data()` - Set QR code data
 
-### 系统状态
+### System Status
 
-- `emote_set_bat_status()` - 更新电池状态
-- `emote_set_label_clock()` - 更新时钟显示
-- `emote_notify_flush_finished()` - 通知刷新完成
+- `emote_set_bat_status()` - Update battery status
+- `emote_set_label_clock()` - Update clock display
+- `emote_notify_flush_finished()` - Notify flush completion
 
-## 事件类型
+## Event Types
 
-组件支持以下事件类型：
+The component supports the following event types:
 
-- `EMOTE_MGR_EVT_IDLE` - 空闲状态
-- `EMOTE_MGR_EVT_SPEAK` - 说话事件
-- `EMOTE_MGR_EVT_LISTEN` - 监听事件
-- `EMOTE_MGR_EVT_SYS` - 系统事件
-- `EMOTE_MGR_EVT_SET` - 设置事件
-- `EMOTE_MGR_EVT_BAT` - 电池事件
-- `EMOTE_MGR_EVT_QRCODE` - QR码事件
+- `EMOTE_MGR_EVT_IDLE` - Idle state
+- `EMOTE_MGR_EVT_SPEAK` - Speaking event
+- `EMOTE_MGR_EVT_LISTEN` - Listening event
+- `EMOTE_MGR_EVT_SYS` - System event
+- `EMOTE_MGR_EVT_SET` - Settings event
+- `EMOTE_MGR_EVT_BAT` - Battery event
+- `EMOTE_MGR_EVT_QRCODE` - QR code event
 
-## 配置说明
+## Configuration
 
-### 图形配置
+### Graphics Configuration
 
-- `h_res` / `v_res` - 水平和垂直分辨率
-- `fps` - 帧率
-- `buf_pixels` - 缓冲区像素数
+- `h_res` / `v_res` - Horizontal and vertical resolution
+- `fps` - Frame rate
+- `buf_pixels` - Buffer pixel count
 
-### 任务配置
+### Task Configuration
 
-- `task_priority` - 任务优先级
-- `task_stack` - 任务栈大小
-- `task_affinity` - CPU亲和性
-- `task_stack_in_ext` - 是否使用外部内存
+- `task_priority` - Task priority
+- `task_stack` - Task stack size
+- `task_affinity` - CPU affinity
+- `task_stack_in_ext` - Whether to use external memory
 
-### 显示标志
+### Display Flags
 
-- `swap` - 是否交换字节序
-- `double_buffer` - 是否使用双缓冲
-- `buff_dma` - 是否使用DMA缓冲区
+- `swap` - Whether to swap byte order
+- `double_buffer` - Whether to use double buffering
+- `buff_dma` - Whether to use DMA buffer
 
-## 示例
+## Examples
 
-完整示例请参考 `test_apps` 目录下的测试应用。
+For complete examples, please refer to the test applications in the `test_apps` directory.
 
-## 许可证
+## License
 
 Apache-2.0
 
-## 贡献
+## Contributing
 
-欢迎提交Issue和Pull Request。
+Issues and Pull Requests are welcome.
 
