@@ -291,7 +291,6 @@ static void emote_dialog_timer_cb(void *user_data)
     }
 
     emote_stop_anim_dialog(handle);
-    ESP_LOGI(TAG, "Emergency dialog animation auto-stopped");
 }
 
 // UI setting functions
@@ -412,13 +411,14 @@ bool emote_stop_anim_dialog(emote_handle_t handle)
         return false;
     }
 
+    gfx_emote_lock(handle->gfx_emote_handle);
+
     // Stop and delete timer if exists
     if (handle->dialog_timer) {
         gfx_timer_delete(handle->gfx_emote_handle, handle->dialog_timer);
         handle->dialog_timer = NULL;
     }
 
-    gfx_emote_lock(handle->gfx_emote_handle);
     gfx_obj_t *obj_emerg_dlg = handle->gfx_objects[EMOTE_OBJ_ANIM_EMERG_DLG];
     if (obj_emerg_dlg) {
         gfx_obj_set_visible(obj_emerg_dlg, false);
@@ -443,25 +443,31 @@ bool emote_insert_anim_dialog(emote_handle_t handle, const char *emoji_name, uin
         return false;
     }
 
+    gfx_emote_lock(handle->gfx_emote_handle);
     if (handle->dialog_timer) {
         gfx_timer_delete(handle->gfx_emote_handle, handle->dialog_timer);
         handle->dialog_timer = NULL;
     }
+    gfx_emote_unlock(handle->gfx_emote_handle);
 
     if (!emote_set_dialog_anim(handle, emoji_name)) {
         return false;
     }
 
-    ESP_LOGI(TAG, "Creating dialog timer: duration=%d ms", duration_ms);
+    gfx_emote_lock(handle->gfx_emote_handle);
+
     gfx_timer_handle_t timer = gfx_timer_create(handle->gfx_emote_handle, emote_dialog_timer_cb, duration_ms, handle);
     if (!timer) {
         ESP_LOGE(TAG, "Failed to create dialog timer");
+        gfx_emote_unlock(handle->gfx_emote_handle);
         emote_stop_anim_dialog(handle);
         return false;
     }
 
     gfx_timer_set_repeat_count(timer, 1);  // Execute only once
     handle->dialog_timer = timer;
+    gfx_emote_unlock(handle->gfx_emote_handle);
+
     return true;
 }
 

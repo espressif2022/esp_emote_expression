@@ -20,14 +20,10 @@ dependencies:
     public: true
 
   espressif2022/esp_emote_gfx:
-    # version: '*'
-    # override_path: /home/xx/esp/esp_emote_gfx
-    git: https://github.com/espressif2022/esp_emote_gfx.git
-    version: "feat/update_fps"
+    version: '^2.0.0'
+    override_path: /home/xuxin/esp_work/esp_emote_gfx
     public: true
 
   espressif2022/esp_emote_assets:
-    # version: '*'
-    # override_path: /home/xx/esp/esp_emote_assets
-    git: https://github.com/espressif2022/esp_emote_assets.git
-    version: "feat/new_tool"
+    version: '^0.0.3'
+    override_path: /home/xuxin/esp_work/esp_emote_assets

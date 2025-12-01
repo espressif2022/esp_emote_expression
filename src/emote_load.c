@@ -242,7 +242,7 @@ static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *
 
     for (int i = 0; i < num; i++) {
         const char *name = mmap_assets_get_name(*target_handle, i);
-        ESP_LOGI(TAG, "Found file: %d, %s", i, name);
+        ESP_LOGD(TAG, "Found file: %d, %s", i, name);
     }
 
     return true;
@@ -425,7 +425,7 @@ static bool emote_load_fonts(emote_handle_t handle, mmap_assets_handle_t asset_h
     }
 
     const char *fontsTextFile = font->valuestring;
-    ESP_LOGI(TAG, "Found text font file: %s", fontsTextFile);
+    ESP_LOGI(TAG, "Foundfont: %s", fontsTextFile);
 
     const uint8_t *fontData = NULL;
     size_t fontSize = 0;

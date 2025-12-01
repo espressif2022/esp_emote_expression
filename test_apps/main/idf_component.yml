@@ -1,11 +1,10 @@
 ## IDF Component Manager Manifest File
 dependencies:
-  espressif/esp-box:
+  espressif/esp-box-3:
     version: "*"
     rules:
     - if: "${IDF_TARGET} == esp32s3"
-    override_path: "../managed_components/espressif__esp-box"
 
-  espressif/esp_emote_expression:
+  espressif2022/esp_emote_expression:
     version: "*"
     override_path: "../.."

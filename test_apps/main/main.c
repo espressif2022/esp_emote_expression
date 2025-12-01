@@ -121,8 +121,7 @@ TEST_CASE("Test boot animation load and play", "[emote_mgr][boot_anim]")
     }
 }
 
-// TEST_CASE("Test assets load and play", "[emote_mgr][assets]")
-void test_assets(void)
+TEST_CASE("Test assets load and play", "[emote_mgr][assets]")
 {
     emote_handle_t handle = init_emote();
     if (handle) {
@@ -162,23 +161,13 @@ void test_assets(void)
         emote_set_event_msg(handle, EMOTE_MGR_EVT_BAT, "1,100");
         vTaskDelay(pdMS_TO_TICKS(3 * 1000));
 
-        // 1. Create custom label with default properties
-        // Note: emote_create_obj_by_type automatically sets default properties:
-        // - Font: font_maison_neue_book_26
-        // - Color: White (0xFFFFFF)
-        // - Size: 100x25 (EMOTE_DEFAULT_LABEL_WIDTH x EMOTE_DEFAULT_LABEL_HEIGHT)
-        // - Text align: Center
-        // - Long mode: Scroll
-        // - Scroll speed: 10ms per pixel
         emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "");
         gfx_obj_t *custom_label_1 = emote_create_obj_by_type(handle, "custom_label_1", "label");
         if (custom_label_1) {
             gfx_label_set_text(custom_label_1, "Custom Label 1");
-            // Optionally customize properties (these override defaults):
-            // gfx_label_set_color(custom_label_1, GFX_COLOR_HEX(0xFF0000));  // Red text
-            // gfx_label_set_font(custom_label_1, (void *)&font_maison_neue_book_12);  // Smaller font
-            // gfx_obj_set_size(custom_label_1, 200, 30);  // Custom size
-            // gfx_obj_align(custom_label_1, GFX_ALIGN_CENTER, 0, 0);  // Center alignment
+            gfx_label_set_color(custom_label_1, GFX_COLOR_HEX(0xFF0000));
+            gfx_obj_set_size(custom_label_1, 200, 30);
+            gfx_obj_align(custom_label_1, GFX_ALIGN_CENTER, 0, 0);
         }
 
         vTaskDelay(pdMS_TO_TICKS(2 * 1000));
@@ -201,6 +190,6 @@ void test_assets(void)
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting Expression Emote test");
-    // unity_run_menu();
-    test_assets();
+    unity_run_menu();
+    // test_assets();
 }
