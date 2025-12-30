@@ -235,7 +235,6 @@ static gfx_obj_t *emote_create_timer_obj(gfx_handle_t gfx_handle, emote_handle_t
 static const obj_type_str_entry_t obj_type_str_table[] = {
     { "anim",    emote_create_anim_obj,  emote_config_anim_obj  },
     { "image",   emote_create_img_obj,   emote_config_img_obj   },
-    { "img",     emote_create_img_obj,   emote_config_img_obj   },
     { "label",   emote_create_label_obj, emote_config_label_obj },
     { "qrcode",  emote_create_qrcode_obj, emote_config_qrcode_obj },
     { "timer",   emote_create_timer_obj, NULL                   },
@@ -284,6 +283,8 @@ static void emote_config_label_obj(gfx_obj_t *obj)
     // Use default font size 26
     gfx_label_set_font(obj, (void *)&font_maison_neue_book_26);
     gfx_obj_set_visible(obj, true);
+
+    ESP_LOGI(TAG, "config label obj:%p", obj);
 }
 
 static void emote_config_label_toast_obj(gfx_obj_t *obj)
@@ -578,8 +579,6 @@ bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *la
     bool longModeLoop = false;
     int longModeSpeed = EMOTE_DEFAULT_SCROLL_SPEED;
     int longModeSnapInterval = 1500;
-
-
 
     cJSON *labelObj = cJSON_GetObjectItem(layout, "label");
     if (cJSON_IsObject(labelObj)) {

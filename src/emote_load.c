@@ -20,7 +20,6 @@
 
 static const char *TAG = "ExpressionEmote";
 
-
 // Hash table implementation
 #define ASSETS_HASH_TABLE_SIZE 64
 
@@ -183,7 +182,7 @@ bool emote_find_data_by_name(mmap_assets_handle_t handle, const char *name,
 
 bool emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht, const char *key, void **result)
 {
-    if (!handle || !ht || !key || !result) {
+    if (!handle || !ht || !key) {
         return false;
     }
     *result = emote_assets_table_get(ht, key);
@@ -238,7 +237,6 @@ static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *
         *target_handle = NULL;
         return false;
     }
-
 
     for (int i = 0; i < num; i++) {
         const char *name = mmap_assets_get_name(*target_handle, i);
@@ -303,6 +301,7 @@ static bool emote_load_emojis(emote_handle_t handle, mmap_assets_handle_t asset_
         emoji_data->loop = loopValue;
         emoji_data->handle = asset_handle;
 
+        ESP_LOGI(TAG, "set emoji data: %s", name->valuestring);
         emote_assets_table_set(handle->emoji_data, name->valuestring, emoji_data);
     }
 
@@ -353,12 +352,12 @@ static bool emote_load_icons(emote_handle_t handle, mmap_assets_handle_t asset_h
         icon_data->size = iconSize;
         icon_data->handle = asset_handle;
 
+        ESP_LOGI(TAG, "set icon data: %s", name->valuestring);
         emote_assets_table_set(handle->icon_data, name->valuestring, icon_data);
     }
 
     return true;
 }
-
 
 static bool emote_load_layouts(emote_handle_t handle, cJSON *root)
 {
@@ -528,6 +527,18 @@ static bool emote_load_boot_anim(emote_handle_t handle, mmap_assets_handle_t ass
     }
 
     return emote_setup_boot_anim(handle, (uint8_t *)src_data, anim_size);
+}
+
+bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon)
+{
+    if (!handle || !name || !icon) {
+        return false;
+    }
+
+    if (!emote_find_data_by_key(handle, handle->icon_data, name, (void **)icon)) {
+        return false;
+    }
+    return true;
 }
 
 bool emote_load_boot_anim_from_source(emote_handle_t handle, const emote_data_t *data)

@@ -66,16 +66,14 @@ bool emote_find_data_by_name(mmap_assets_handle_t handle, const char *name,
                              const uint8_t **data, size_t *size);
 
 /**
- * @brief  Find asset data by key from hash table
+ * @brief  Find data by key from hash table
  *
  * @param[in]   handle  Emote handle
  * @param[in]   ht      Hash table to search
  * @param[in]   key     Key to search for
  * @param[out]  result  Output pointer to store result
  *
- * @return
- *       - true   Key found
- *       - false  Key not found
+ * @return true on success, false on failure
  */
 bool emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht,
                             const char *key, void **result);

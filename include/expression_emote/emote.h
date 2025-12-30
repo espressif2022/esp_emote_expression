@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "gfx.h"
+#include "esp_mmap_assets.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,6 +67,20 @@ typedef struct {
     } task;
     emote_flush_ready_cb_t flush_cb;  // Flush ready callback (can be NULL)
 } emote_config_t;
+
+typedef struct {
+    const void *data;
+    size_t size;
+    mmap_assets_handle_t handle;
+} icon_data_t;
+
+typedef struct {
+    const void *data;
+    size_t size;
+    uint8_t fps;
+    bool loop;
+    mmap_assets_handle_t handle;
+} emoji_data_t;
 
 // ===== API FUNCTIONS =====
 
@@ -193,6 +208,15 @@ gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name);
  * @return Pointer to gfx_obj_t on success, NULL on failure
  */
 gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, const char *type_str);
+
+/**
+ * @brief Get icon data by name
+ * @param handle Handle to emote manager
+ * @param name Icon name
+ * @param icon Icon data pointer (output parameter)
+ * @return true on success, false on failure
+ */
+bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon);
 
 #ifdef __cplusplus
 }

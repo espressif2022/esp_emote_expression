@@ -19,20 +19,20 @@ extern "C" {
 // Forward declaration
 typedef struct emote_s emote_t;
 
-// Internal data structures
-typedef struct {
-    const void *data;
-    size_t size;
-    uint8_t fps;
-    bool loop;
-    mmap_assets_handle_t handle;
-} emoji_data_t;
+// // Internal data structures
+// typedef struct {
+//     const void *data;
+//     size_t size;
+//     uint8_t fps;
+//     bool loop;
+//     mmap_assets_handle_t handle;
+// } emoji_data_t;
 
-typedef struct {
-    const void *data;
-    size_t size;
-    mmap_assets_handle_t handle;
-} icon_data_t;
+// typedef struct {
+//     const void *data;
+//     size_t size;
+//     mmap_assets_handle_t handle;
+// } icon_data_t;
 
 // Custom object mapping entry (for user-defined objects)
 typedef struct emote_custom_obj_entry_s {
