@@ -244,7 +244,7 @@ static bool emote_set_emoji_animation(emote_handle_t handle, const char *emoji_n
         return false;
     }
 
-    ESP_LOGI(TAG, "Setting emoji: %s (fps=%d, loop=%s)",
+    ESP_LOGD(TAG, "Setting emoji: %s (fps=%d, loop=%s)",
              emoji_name, emoji->fps, emoji->loop ? "true" : "false");
 
     gfx_obj_t *obj = handle->gfx_objects[obj_type];
@@ -563,6 +563,20 @@ bool emote_notify_flush_finished(emote_handle_t handle)
 
     if (handle->gfx_emote_handle) {
         gfx_emote_flush_ready(handle->gfx_emote_handle, true);
+        return true;
+    }
+    return false;
+}
+
+
+bool emote_notify_all_refresh(emote_handle_t handle)
+{
+    if (!handle || !handle->is_initialized) {
+        return false;
+    }
+
+    if (handle->gfx_emote_handle) {
+        gfx_emote_refresh_all(handle->gfx_emote_handle);
         return true;
     }
     return false;

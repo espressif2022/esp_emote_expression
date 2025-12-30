@@ -85,7 +85,7 @@ emote_handle_t emote_init(const emote_config_t *config)
             .swap = config->flags.swap,
             .double_buffer = config->flags.double_buffer,
             .buff_dma = config->flags.buff_dma,
-            .buff_spiram = 0,
+            .buff_spiram = config->flags.buff_spiram,
         },
         .h_res = (uint32_t)config->gfx_emote.h_res,
         .v_res = (uint32_t)config->gfx_emote.v_res,

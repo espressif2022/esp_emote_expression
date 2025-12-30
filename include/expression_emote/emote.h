@@ -48,6 +48,7 @@ typedef struct {
         bool swap;
         bool double_buffer;
         bool buff_dma;
+        bool buff_spiram;
     } flags;
     struct {
         int h_res;
@@ -168,6 +169,13 @@ bool emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *da
  * @return true on success, false on failure
  */
 bool emote_notify_flush_finished(emote_handle_t handle);
+
+/**
+ * @brief Notify that all refresh operation is finished
+ * @param handle Handle to emote manager
+ * @return true on success, false on failure
+ */
+bool emote_notify_all_refresh(emote_handle_t handle);
 
 /**
  * @brief Get graphics object by name
