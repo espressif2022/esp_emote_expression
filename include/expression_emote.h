@@ -5,4 +5,6 @@
  */
 #pragma once
 
-#include "expression_emote/emote.h"
+#include "expression_emote/emote_init.h"
+#include "expression_emote/emote_assets.h"
+#include "expression_emote/emote_api.h"
