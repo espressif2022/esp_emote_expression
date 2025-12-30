@@ -534,11 +534,15 @@ bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_d
     if (!handle || !name || !icon) {
         return false;
     }
+    return emote_find_data_by_key(handle, handle->icon_data, name, (void **)icon);
+}
 
-    if (!emote_find_data_by_key(handle, handle->icon_data, name, (void **)icon)) {
+bool emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji)
+{
+    if (!handle || !name || !emoji) {
         return false;
     }
-    return true;
+    return emote_find_data_by_key(handle, handle->emoji_data, name, (void **)emoji);
 }
 
 bool emote_load_boot_anim_from_source(emote_handle_t handle, const emote_data_t *data)

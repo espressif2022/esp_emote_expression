@@ -27,6 +27,13 @@ extern "C" {
 // ===== OPAQUE HANDLE =====
 typedef struct emote_s *emote_handle_t;
 
+// ===== OBJECT TYPE STRINGS =====
+#define EMOTE_OBJ_TYPE_ANIM    "anim"
+#define EMOTE_OBJ_TYPE_IMAGE   "image"
+#define EMOTE_OBJ_TYPE_LABEL   "label"
+#define EMOTE_OBJ_TYPE_QRCODE  "qrcode"
+#define EMOTE_OBJ_TYPE_TIMER   "timer"
+
 // ===== CONFIGURATION STRUCTURES =====
 typedef enum {
     EMOTE_SOURCE_PATH = 0,
@@ -68,13 +75,13 @@ typedef struct {
     emote_flush_ready_cb_t flush_cb;  // Flush ready callback (can be NULL)
 } emote_config_t;
 
-typedef struct {
+typedef struct icon_data_s {
     const void *data;
     size_t size;
     mmap_assets_handle_t handle;
 } icon_data_t;
 
-typedef struct {
+typedef struct emoji_data_s {
     const void *data;
     size_t size;
     uint8_t fps;
@@ -108,10 +115,10 @@ bool emote_is_initialized(emote_handle_t handle);
 /**
  * @brief Set emoji animation on eye object
  * @param handle Handle to emote manager
- * @param emoji_name Name of the emoji animation
+ * @param name Name of the emoji animation
  * @return true on success, false on failure
  */
-bool emote_set_anim_emoji(emote_handle_t handle, const char *emoji_name);
+bool emote_set_anim_emoji(emote_handle_t handle, const char *name);
 
 /**
  * @brief Set QR code data
@@ -124,19 +131,19 @@ bool emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text);
 /**
  * @brief Set emergency dialog animation
  * @param handle Handle to emote manager
- * @param emoji_name Name of the emoji animation
+ * @param name Name of the emoji animation
  * @return true on success, false on failure
  */
-bool emote_set_dialog_anim(emote_handle_t handle, const char *emoji_name);
+bool emote_set_dialog_anim(emote_handle_t handle, const char *name);
 
 /**
  * @brief Insert emergency dialog animation with auto-stop timer
  * @param handle Handle to emote manager
- * @param emoji_name Name of the emoji animation
+ * @param name Name of the emoji animation
  * @param duration_ms Duration in milliseconds before auto-stopping
  * @return true on success, false on failure
  */
-bool emote_insert_anim_dialog(emote_handle_t handle, const char *emoji_name, uint32_t duration_ms);
+bool emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms);
 
 /**
  * @brief Stop emergency dialog animation
@@ -217,6 +224,15 @@ gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, con
  * @return true on success, false on failure
  */
 bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon);
+
+/**
+ * @brief Get emoji data by name
+ * @param handle Handle to emote manager
+ * @param name Emoji name
+ * @param emoji Emoji data pointer (output parameter)
+ * @return true on success, false on failure
+ */
+bool emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji);
 
 #ifdef __cplusplus
 }
