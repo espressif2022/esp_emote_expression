@@ -38,6 +38,7 @@ typedef struct assets_hash_table_s assets_hash_table_t;
 // ===== OBJECT TYPE ENUM =====
 typedef enum {
     EMOTE_DEF_OBJ_ANIM_BOOT = 0,      // For boot animation playback
+    EMOTE_DEF_OBJ_LEBAL_DEFAULT,      // For default label
     EMOTE_DEF_OBJ_ANIM_EYE,           // For AI buddy eye expressions
     EMOTE_DEF_OBJ_ANIM_LISTEN,        // For listening indicator
     EMOTE_DEF_OBJ_ANIM_EMERG_DLG,     // For emergency dialog
@@ -69,11 +70,11 @@ struct emote_s {
 
     lv_font_t *gfx_font;
 
-    bool battery_is_charging;
+    bool bat_is_charging;
     int8_t battery_percent;
 
-    assets_hash_table_t *emoji_data;
-    assets_hash_table_t *icon_data;
+    assets_hash_table_t *emoji_table;
+    assets_hash_table_t *icon_table;
 
     mmap_assets_handle_t assets_handle;
 
@@ -93,6 +94,10 @@ struct emote_s {
     gfx_timer_handle_t dialog_timer;
 
     emote_flush_ready_cb_t flush_cb;
+    emote_update_cb_t update_cb;
+
+    int h_res;
+    int v_res;
 };
 
 #ifdef __cplusplus

@@ -6,7 +6,7 @@ menu "Expression Emote Configuration"
 
     config EMOTE_DEF_LABEL_HEIGHT
         int "Default label height(pixels)"
-        default 25
+        default 30
 
     config EMOTE_DEF_LABEL_WIDTH
         int "Default label width(pixels)"
@@ -21,7 +21,7 @@ menu "Expression Emote Configuration"
     config EMOTE_DEF_ANIMATION_FPS
         int "Default animation FPS"
         default 20
-        range 1 120
+        range 1 60
 
     config EMOTE_DEF_FONT_COLOR
         hex "Default font color"

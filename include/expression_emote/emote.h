@@ -34,6 +34,7 @@ extern "C" {
  * used by the emote system. These can be used as default identifiers for UI elements.
  */
 #define EMT_DEF_ELEM_BOOT_ANIM          "boot_anim"
+#define EMT_DEF_ELEM_DEFAULT_LABEL      "default_label"
 #define EMT_DEF_ELEM_EYE_ANIM           "eye_anim"
 #define EMT_DEF_ELEM_EMERG_DLG          "emerg_dlg"
 #define EMT_DEF_ELEM_TOAST_LABEL        "toast_label"
@@ -76,6 +77,7 @@ typedef struct {
 
 // ===== FLUSH READY CALLBACK =====
 typedef void (*emote_flush_ready_cb_t)(int x_start, int y_start, int x_end, int y_end, const void *data, emote_handle_t manager);
+typedef void (*emote_update_cb_t)(gfx_player_event_t event, const void *obj, emote_handle_t manager);
 
 typedef struct {
     struct {

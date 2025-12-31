@@ -11,8 +11,10 @@
 
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "emote_defs.h"
 #include "emote_assets.h"
+#include "emote_layout.h"
 #include "widget/gfx_font_lvgl.h"
 
 static const char *TAG = "ExpressionEmote";
@@ -32,9 +34,14 @@ void emote_update_cb_wrapper(gfx_handle_t handle, gfx_player_event_t event, cons
         return;
     }
 
+    if (self && self->update_cb) {
+        self->update_cb(event, obj, self);
+    }
+
     if (event == GFX_PLAYER_EVENT_ALL_FRAME_DONE) {
-        if (self->def_objects[EMOTE_DEF_OBJ_ANIM_BOOT]) {
-        }
+        // if (self->def_objects[EMOTE_DEF_OBJ_ANIM_BOOT]) {
+        // }
+        ESP_LOGI(TAG, "All frame done: [%p]", obj);
     } else if (event == GFX_PLAYER_EVENT_IDLE) {
         ESP_LOGI(TAG, "Idle");
     }
@@ -42,39 +49,31 @@ void emote_update_cb_wrapper(gfx_handle_t handle, gfx_player_event_t event, cons
 
 emote_handle_t emote_init(const emote_config_t *config)
 {
-    ESP_LOGI(TAG, "EmoteManager init");
-    if (!config) {
-        return NULL;
-    }
+    esp_err_t ret = ESP_OK;
+    emote_handle_t handle = NULL;
+    gfx_obj_t *boot_obj = NULL;
+    gfx_obj_t *obj_default = NULL;
+
+    ESP_GOTO_ON_FALSE(config, ESP_ERR_INVALID_ARG, error, TAG, "config is NULL");
 
     // Allocate handle
-    emote_handle_t handle = (emote_handle_t)calloc(1, sizeof(struct emote_s));
-    if (!handle) {
-        ESP_LOGE(TAG, "Failed to allocate emote manager handle");
-        return NULL;
-    }
+    handle = (emote_handle_t)calloc(1, sizeof(struct emote_s));
+    ESP_GOTO_ON_FALSE(handle, ESP_ERR_NO_MEM, error, TAG, "Failed to allocate emote manager handle");
 
     memset(handle, 0, sizeof(struct emote_s));
 
     // Initialize hash tables
-    handle->emoji_data = emote_assets_table_create();
-    if (!handle->emoji_data) {
-        ESP_LOGE(TAG, "Failed to create emoji_data hash table");
-        free(handle);
-        return NULL;
-    }
-    handle->icon_data = emote_assets_table_create();
-    if (!handle->icon_data) {
-        ESP_LOGE(TAG, "Failed to create icon_data hash table");
-        emote_assets_table_destroy(handle->emoji_data);
-        free(handle);
-        return NULL;
-    }
+    handle->emoji_table = emote_assets_table_create("emoji");
+    ESP_GOTO_ON_FALSE(handle->emoji_table, ESP_ERR_NO_MEM, error, TAG, "Failed to create emoji_table hash table");
+
+    handle->icon_table = emote_assets_table_create("icon");
+    ESP_GOTO_ON_FALSE(handle->icon_table, ESP_ERR_NO_MEM, error, TAG, "Failed to create icon_table hash table");
 
     // Initialize battery_percent
     handle->battery_percent = -1;
-
     handle->flush_cb = config->flush_cb;
+    handle->h_res = config->gfx_emote.h_res;
+    handle->v_res = config->gfx_emote.v_res;
 
     gfx_core_config_t gfx_cfg = {
         .flush_cb = emote_flush_cb_wrapper,
@@ -103,20 +102,46 @@ emote_handle_t emote_init(const emote_config_t *config)
     };
 
     handle->gfx_emote_handle = gfx_emote_init(&gfx_cfg);
-    if (!handle->gfx_emote_handle) {
-        ESP_LOGE(TAG, "Failed to initialize emote_gfx");
-        emote_assets_table_destroy(handle->emoji_data);
-        emote_assets_table_destroy(handle->icon_data);
-        free(handle);
-        return NULL;
-    }
+    ESP_GOTO_ON_FALSE(handle->gfx_emote_handle, ESP_ERR_INVALID_STATE, error, TAG, "Failed to initialize emote_gfx");
 
+    // Default set
     gfx_emote_lock(handle->gfx_emote_handle);
     gfx_emote_set_bg_color(handle->gfx_emote_handle, GFX_COLOR_HEX(EMOTE_DEF_BG_COLOR));
-    gfx_emote_unlock(handle->gfx_emote_handle);
 
+    boot_obj = emote_create_obj_by_name(handle, EMT_DEF_ELEM_BOOT_ANIM);
+    ESP_GOTO_ON_FALSE(boot_obj, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to create boot animation");
+    gfx_obj_align(boot_obj, GFX_ALIGN_CENTER, 0, 0);
+
+    obj_default = emote_create_obj_by_name(handle, EMT_DEF_ELEM_DEFAULT_LABEL);
+    ESP_GOTO_ON_FALSE(obj_default, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to create default label");
+
+    gfx_emote_unlock(handle->gfx_emote_handle);
+    ESP_LOGI(TAG, "Create default objects: boot: [%p], label: [%p]", boot_obj, obj_default);
     handle->is_initialized = true;
     return handle;
+
+error_unlock:
+    if (handle && handle->gfx_emote_handle) {
+        gfx_emote_unlock(handle->gfx_emote_handle);
+    }
+
+error:
+    if (handle) {
+        if (handle->gfx_emote_handle) {
+            gfx_emote_deinit(handle->gfx_emote_handle);
+            handle->gfx_emote_handle = NULL;
+        }
+        if (handle->emoji_table) {
+            emote_assets_table_destroy(handle->emoji_table);
+            handle->emoji_table = NULL;
+        }
+        if (handle->icon_table) {
+            emote_assets_table_destroy(handle->icon_table);
+            handle->icon_table = NULL;
+        }
+        free(handle);
+    }
+    return NULL;
 }
 
 bool emote_deinit(emote_handle_t handle)
@@ -208,13 +233,13 @@ bool emote_deinit(emote_handle_t handle)
     }
 
     // Cleanup hash tables
-    if (handle->emoji_data) {
-        emote_assets_table_destroy(handle->emoji_data);
-        handle->emoji_data = NULL;
+    if (handle->emoji_table) {
+        emote_assets_table_destroy(handle->emoji_table);
+        handle->emoji_table = NULL;
     }
-    if (handle->icon_data) {
-        emote_assets_table_destroy(handle->icon_data);
-        handle->icon_data = NULL;
+    if (handle->icon_table) {
+        emote_assets_table_destroy(handle->icon_table);
+        handle->icon_table = NULL;
     }
 
     // Cleanup emergency dialog timer

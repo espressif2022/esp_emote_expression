@@ -31,6 +31,7 @@ typedef struct assets_hash_entry_s {
 } assets_hash_entry_t;
 
 struct assets_hash_table_s {
+    char *name;
     assets_hash_entry_t *buckets[ASSETS_HASH_TABLE_SIZE];
 };
 
@@ -44,9 +45,16 @@ static uint32_t emote_assets_hash_string(const char *str)
     return hash;
 }
 
-assets_hash_table_t *emote_assets_table_create(void)
+assets_hash_table_t *emote_assets_table_create(const char *name)
 {
     assets_hash_table_t *ht = (assets_hash_table_t *)calloc(1, sizeof(assets_hash_table_t));
+    if (ht && name) {
+        ht->name = strdup(name);
+        if (!ht->name) {
+            free(ht);
+            return NULL;
+        }
+    }
     return ht;
 }
 
@@ -68,6 +76,9 @@ void emote_assets_table_destroy(assets_hash_table_t *ht)
             free(entry);
             entry = next;
         }
+    }
+    if (ht->name) {
+        free(ht->name);
     }
     free(ht);
 }
@@ -191,7 +202,7 @@ static bool emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *h
     }
     *result = emote_assets_table_get(ht, key);
     if (!*result) {
-        ESP_LOGE(TAG, "Data not found: %s", key);
+        ESP_LOGE(TAG, "table:%s not found: %s", ht->name, key);
         return false;
     }
     return true;
@@ -306,7 +317,7 @@ static bool emote_load_emojis(emote_handle_t handle, cJSON *root)
         emoji_data->loop = loopValue;
 
         ESP_LOGI(TAG, "set emoji data: %s", name->valuestring);
-        emote_assets_table_set(handle->emoji_data, name->valuestring, emoji_data);
+        emote_assets_table_set(handle->emoji_table, name->valuestring, emoji_data);
     }
 
     return true;
@@ -355,7 +366,7 @@ static bool emote_load_icons(emote_handle_t handle, cJSON *root)
         icon_data->size = iconSize;
 
         ESP_LOGI(TAG, "set icon data: %s", name->valuestring);
-        emote_assets_table_set(handle->icon_data, name->valuestring, icon_data);
+        emote_assets_table_set(handle->icon_table, name->valuestring, icon_data);
     }
 
     return true;
@@ -506,7 +517,7 @@ bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_d
     if (!handle || !name || !icon) {
         return false;
     }
-    return emote_find_data_by_key(handle, handle->icon_data, name, (void **)icon);
+    return emote_find_data_by_key(handle, handle->icon_table, name, (void **)icon);
 }
 
 bool emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji)
@@ -514,7 +525,7 @@ bool emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji
     if (!handle || !name || !emoji) {
         return false;
     }
-    return emote_find_data_by_key(handle, handle->emoji_data, name, (void **)emoji);
+    return emote_find_data_by_key(handle, handle->emoji_table, name, (void **)emoji);
 }
 
 bool emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *data)

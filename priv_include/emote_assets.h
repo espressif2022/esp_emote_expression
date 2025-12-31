@@ -18,11 +18,13 @@ extern "C" {
 /**
  * @brief  Create a new assets hash table
  *
+ * @param[in]  name  Name of the hash table (for logging/debugging, can be NULL)
+ *
  * @return
  *       - Pointer to hash table  On success
  *       - NULL                  Fail to create hash table
  */
-assets_hash_table_t *emote_assets_table_create(void);
+assets_hash_table_t *emote_assets_table_create(const char *name);
 
 /**
  * @brief  Destroy and free assets hash table

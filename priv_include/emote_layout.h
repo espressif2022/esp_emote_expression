@@ -137,6 +137,18 @@ bool emote_set_label_clock(emote_handle_t handle);
  */
 bool emote_set_bat_status(emote_handle_t handle);
 
+/**
+ * @brief  Create object by name
+ *
+ * @param[in]  handle  Emote handle
+ * @param[in]  name    Object name
+ *
+ * @return
+ *       - Pointer to object  On success
+ *       - NULL               Fail to create object
+ */
+gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *name);
+
 #ifdef __cplusplus
 }
 #endif

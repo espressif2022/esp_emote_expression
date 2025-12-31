@@ -3,9 +3,7 @@
 
 exclude: |
   (?x)(
-    .*/assets/.*
-    | mmap_generate_*.h
-    | font_puhui_16_4.c
+    .*/default_assets/.*
     | docs/.*
   )
 repos:

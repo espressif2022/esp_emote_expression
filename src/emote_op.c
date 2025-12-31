@@ -49,14 +49,11 @@ static gfx_image_dsc_t *emote_get_img_dsc_by_obj_type(emote_handle_t handle, emo
 static void emote_set_eye_hidden(emote_handle_t handle, bool hidden);
 
 // UI helper functions
-static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type,
-                                 const char *name, bool visible);
-static bool emote_set_icon_animation(emote_handle_t handle, const char *name,
-                                     emote_obj_type_t obj_type, uint8_t fps, bool loop);
-static bool emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type,
-                                 const char *text);
-static bool emote_set_emoji_animation(emote_handle_t handle, const char *name,
-                                      emote_obj_type_t obj_type);
+static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type, const char *name, bool visible);
+static bool emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type, const char *text);
+static bool emote_set_emoji_animation(emote_handle_t handle, emote_obj_type_t obj_type, const char *name);
+static bool emote_set_icon_animation(emote_handle_t handle, emote_obj_type_t obj_type,
+                                     const char *name, uint8_t fps, bool loop);
 
 // Event handler functions
 static bool emote_handle_idle_event(emote_handle_t handle, const char *message);
@@ -137,8 +134,7 @@ static void emote_set_eye_hidden(emote_handle_t handle, bool hidden)
 }
 
 // UI helper functions
-static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type,
-                                 const char *name, bool visible)
+static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type, const char *name, bool visible)
 {
     if (!handle || !name) {
         return false;
@@ -190,8 +186,8 @@ static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_typ
     return true;
 }
 
-static bool emote_set_icon_animation(emote_handle_t handle, const char *name,
-                                     emote_obj_type_t obj_type, uint8_t fps, bool loop)
+static bool emote_set_icon_animation(emote_handle_t handle, emote_obj_type_t obj_type,
+                                     const char *name, uint8_t fps, bool loop)
 {
     if (!handle || !name) {
         return false;
@@ -237,7 +233,7 @@ static bool emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_typ
     }
 
     gfx_obj_t *obj = handle->def_objects[obj_type];
-    if (!obj) {
+    if (!obj && !(obj = handle->def_objects[EMOTE_DEF_OBJ_LEBAL_DEFAULT])) {
         return false;
     }
 
@@ -248,8 +244,8 @@ static bool emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_typ
     return true;
 }
 
-static bool emote_set_emoji_animation(emote_handle_t handle, const char *name,
-                                      emote_obj_type_t obj_type)
+static bool emote_set_emoji_animation(emote_handle_t handle, emote_obj_type_t obj_type,
+                                      const char *name)
 {
     if (!handle || !name) {
         return false;
@@ -303,7 +299,7 @@ static bool emote_handle_idle_event(emote_handle_t handle, const char *message)
 
 static bool emote_handle_listen_event(emote_handle_t handle, const char *message)
 {
-    emote_set_icon_animation(handle, EMOTE_ICON_LISTEN, EMOTE_DEF_OBJ_ANIM_LISTEN, 15, true);
+    emote_set_icon_animation(handle, EMOTE_DEF_OBJ_ANIM_LISTEN, EMOTE_ICON_LISTEN, 15, true);
     emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_MIC, true);
     return true;
 }
@@ -352,7 +348,7 @@ static bool emote_handle_bat_event(emote_handle_t handle, const char *message)
     char *comma_pos = strchr(message, ',');
     if (comma_pos) {
         int percent = atoi(comma_pos + 1);
-        handle->battery_is_charging = (message[0] == '1');
+        handle->bat_is_charging = (message[0] == '1');
         handle->battery_percent = (percent < 0) ? 0 : (percent > 100 ? 100 : percent);
     }
     return true;
@@ -386,9 +382,9 @@ bool emote_set_bat_status(emote_handle_t handle)
     if (handle->battery_percent >= 0) {
         char percent_str[16];
         snprintf(percent_str, sizeof(percent_str), "%d", handle->battery_percent);
-        emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_BATTERY_BG, true);
         emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_BATTERY, percent_str);
-        emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_CHARGE, EMOTE_ICON_BATTERY_CHARGE, handle->battery_is_charging);
+        emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_BATTERY_BG, true);
+        emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_CHARGE, EMOTE_ICON_BATTERY_CHARGE, handle->bat_is_charging);
     }
     return true;
 }
@@ -433,7 +429,7 @@ bool emote_set_label_clock(emote_handle_t handle)
 bool emote_set_anim_emoji(emote_handle_t handle, const char *name)
 {
     emote_set_eye_hidden(handle, false);
-    if (!emote_set_emoji_animation(handle, name, EMOTE_DEF_OBJ_ANIM_EYE)) {
+    if (!emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EYE, name)) {
         return false;
     }
     return true;
@@ -442,7 +438,7 @@ bool emote_set_anim_emoji(emote_handle_t handle, const char *name)
 bool emote_set_dialog_anim(emote_handle_t handle, const char *name)
 {
     emote_set_eye_hidden(handle, true);
-    if (!emote_set_emoji_animation(handle, name, EMOTE_DEF_OBJ_ANIM_EMERG_DLG)) {
+    if (!emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EMERG_DLG, name)) {
         return false;
     }
 
@@ -560,6 +556,7 @@ bool emote_set_event_msg(emote_handle_t handle, const char *event, const char *m
         HIDE_OBJ(handle, EMOTE_DEF_OBJ_ICON_CHARGE);
         HIDE_OBJ(handle, EMOTE_DEF_OBJ_ICON_STATUS);
         HIDE_OBJ(handle, EMOTE_DEF_OBJ_QRCODE);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_LEBAL_DEFAULT);
         gfx_obj_t *obj_timer = handle->def_objects[EMOTE_DEF_OBJ_TIMER_STATUS];
         if (obj_timer) {
             gfx_timer_pause((gfx_timer_handle_t)obj_timer);
