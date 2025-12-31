@@ -11,7 +11,8 @@
 
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "emote_init.h"
+#include "emote_defs.h"
+#include "emote_assets.h"
 #include "widget/gfx_font_lvgl.h"
 
 static const char *TAG = "ExpressionEmote";
@@ -32,9 +33,7 @@ void emote_update_cb_wrapper(gfx_handle_t handle, gfx_player_event_t event, cons
     }
 
     if (event == GFX_PLAYER_EVENT_ALL_FRAME_DONE) {
-        if (self->gfx_objects[EMOTE_OBJ_ANIM_BOOT]) {
-            ESP_LOGI(TAG, "Boot animation completed");
-            self->boot_anim_completed = true;
+        if (self->def_objects[EMOTE_DEF_OBJ_ANIM_BOOT]) {
         }
     } else if (event == GFX_PLAYER_EVENT_IDLE) {
         ESP_LOGI(TAG, "Idle");
@@ -112,6 +111,10 @@ emote_handle_t emote_init(const emote_config_t *config)
         return NULL;
     }
 
+    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_set_bg_color(handle->gfx_emote_handle, GFX_COLOR_HEX(EMOTE_DEF_BG_COLOR));
+    gfx_emote_unlock(handle->gfx_emote_handle);
+
     handle->is_initialized = true;
     return handle;
 }
@@ -129,14 +132,14 @@ bool emote_deinit(emote_handle_t handle)
     // Cleanup objects
     if (handle->gfx_emote_handle) {
         gfx_emote_lock(handle->gfx_emote_handle);
-        for (int i = 0; i < EMOTE_OBJ_MAX; i++) {
-            if (handle->gfx_objects[i]) {
-                if (i == EMOTE_OBJ_TIMER_STATUS) {
-                    gfx_timer_delete(handle->gfx_emote_handle, (gfx_timer_handle_t)handle->gfx_objects[i]);
+        for (int i = 0; i < EMOTE_DEF_OBJ_MAX; i++) {
+            if (handle->def_objects[i]) {
+                if (i == EMOTE_DEF_OBJ_TIMER_STATUS) {
+                    gfx_timer_delete(handle->gfx_emote_handle, (gfx_timer_handle_t)handle->def_objects[i]);
                 } else {
-                    gfx_obj_delete(handle->gfx_objects[i]);
+                    gfx_obj_delete(handle->def_objects[i]);
                 }
-                handle->gfx_objects[i] = NULL;
+                handle->def_objects[i] = NULL;
             }
         }
         // Cleanup custom objects
@@ -193,13 +196,9 @@ bool emote_deinit(emote_handle_t handle)
     }
 
     // Cleanup assets
-    if (handle->emote_assets_handle) {
-        mmap_assets_del(handle->emote_assets_handle);
-        handle->emote_assets_handle = NULL;
-    }
-    if (handle->boot_assets_handle) {
-        mmap_assets_del(handle->boot_assets_handle);
-        handle->boot_assets_handle = NULL;
+    if (handle->assets_handle) {
+        mmap_assets_del(handle->assets_handle);
+        handle->assets_handle = NULL;
     }
 
     // Cleanup font

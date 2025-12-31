@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -12,16 +13,16 @@
 
 #include "expression_emote.h"
 
-#include "emote_load.h"
-#include "emote_init.h"
-#include "emote_setup.h"
+#include "emote_defs.h"
+#include "emote_assets.h"
+#include "emote_layout.h"
 #include "gfx.h"
 #include "cJSON.h"
 
 static const char *TAG = "ExpressionEmote";
 
 // Hash table implementation
-#define ASSETS_HASH_TABLE_SIZE 64
+#define ASSETS_HASH_TABLE_SIZE CONFIG_EMOTE_ASSETS_HASH_TABLE_SIZE
 
 typedef struct assets_hash_entry_s {
     char *key;
@@ -117,12 +118,13 @@ static void *emote_assets_table_get(assets_hash_table_t *ht, const char *key)
     return NULL;
 }
 
-const void *emote_acquire_data(emote_handle_t handle, mmap_assets_handle_t asset_handle,
-                               const void *data_ref, size_t size, void **output_ptr)
+const void *emote_acquire_data(emote_handle_t handle, const void *data_ref, size_t size, void **output_ptr)
 {
     if (!handle) {
         return NULL;
     }
+
+    mmap_assets_handle_t asset_handle = handle->assets_handle;
 
     const size_t OFFSET_THRESHOLD = 0x1000000;
     bool is_executed = ((size_t)data_ref < OFFSET_THRESHOLD);
@@ -155,19 +157,21 @@ const void *emote_acquire_data(emote_handle_t handle, mmap_assets_handle_t asset
     return buffer;
 }
 
-bool emote_find_data_by_name(mmap_assets_handle_t handle, const char *name,
-                             const uint8_t **data, size_t *size)
+static bool emote_find_data_by_name(emote_handle_t handle, const char *name,
+                                    const uint8_t **data, size_t *size)
 {
-    if (!name || !data || !size || !handle) {
+    if (!name || !data || !size || !handle->assets_handle) {
         return false;
     }
 
-    int fileNum = mmap_assets_get_stored_files(handle);
+    mmap_assets_handle_t asset_handle = handle->assets_handle;
+
+    int fileNum = mmap_assets_get_stored_files(asset_handle);
     for (int i = 0; i < fileNum; i++) {
-        const char *currentFileName = mmap_assets_get_name(handle, i);
+        const char *currentFileName = mmap_assets_get_name(asset_handle, i);
         if (currentFileName && strcmp(currentFileName, name) == 0) {
-            const uint8_t *fileData = mmap_assets_get_mem(handle, i);
-            size_t fileSize = mmap_assets_get_size(handle, i);
+            const uint8_t *fileData = mmap_assets_get_mem(asset_handle, i);
+            size_t fileSize = mmap_assets_get_size(asset_handle, i);
             if (fileData && fileSize > 0) {
                 *data = fileData;
                 *size = fileSize;
@@ -180,7 +184,7 @@ bool emote_find_data_by_name(mmap_assets_handle_t handle, const char *name,
     return false;
 }
 
-bool emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht, const char *key, void **result)
+static bool emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht, const char *key, void **result)
 {
     if (!handle || !ht || !key) {
         return false;
@@ -193,10 +197,9 @@ bool emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht, cons
     return true;
 }
 
-static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *data,
-                                     mmap_assets_handle_t *target_handle, const char *log_prefix)
+static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *data)
 {
-    if (!handle || !data || !target_handle) {
+    if (!handle || !data) {
         return false;
     }
 
@@ -204,12 +207,12 @@ static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *
     memset(&asset_config, 0, sizeof(asset_config));
 
     if (data->type == EMOTE_SOURCE_PATH) {
-        ESP_LOGI(TAG, "%s from file: path=%s", log_prefix, data->source.path);
+        ESP_LOGI(TAG, "Loading assets from file: path=%s", data->source.path);
         asset_config.partition_label = data->source.path;
         asset_config.flags.use_fs = true;
         asset_config.flags.full_check = true;
     } else if (data->type == EMOTE_SOURCE_PARTITION) {
-        ESP_LOGI(TAG, "%s from partition: label=%s", log_prefix, data->source.partition_label);
+        ESP_LOGI(TAG, "Loading assets from partition: label=%s", data->source.partition_label);
         asset_config.partition_label = data->source.partition_label;
         asset_config.flags.mmap_enable = true;
         asset_config.flags.full_check = true;
@@ -217,6 +220,8 @@ static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *
         ESP_LOGE(TAG, "Unknown source type");
         return false;
     }
+
+    mmap_assets_handle_t *target_handle = &handle->assets_handle;
 
     if (*target_handle) {
         ESP_LOGI(TAG, "Deleting existing assets handle: %p", *target_handle);
@@ -246,7 +251,7 @@ static bool emote_load_assets_handle(emote_handle_t handle, const emote_data_t *
     return true;
 }
 
-static bool emote_load_emojis(emote_handle_t handle, mmap_assets_handle_t asset_handle, cJSON *root)
+static bool emote_load_emojis(emote_handle_t handle, cJSON *root)
 {
     if (!handle || !root) {
         return false;
@@ -274,7 +279,7 @@ static bool emote_load_emojis(emote_handle_t handle, mmap_assets_handle_t asset_
 
         const uint8_t *emojiData = NULL;
         size_t emojiSize = 0;
-        if (!emote_find_data_by_name(asset_handle, file->valuestring, &emojiData, &emojiSize)) {
+        if (!emote_find_data_by_name(handle, file->valuestring, &emojiData, &emojiSize)) {
             ESP_LOGE(TAG, "Failed to get emoji data for: %s", file->valuestring);
             continue;
         }
@@ -299,7 +304,6 @@ static bool emote_load_emojis(emote_handle_t handle, mmap_assets_handle_t asset_
         emoji_data->size = emojiSize;
         emoji_data->fps = fpsValue;
         emoji_data->loop = loopValue;
-        emoji_data->handle = asset_handle;
 
         ESP_LOGI(TAG, "set emoji data: %s", name->valuestring);
         emote_assets_table_set(handle->emoji_data, name->valuestring, emoji_data);
@@ -308,7 +312,7 @@ static bool emote_load_emojis(emote_handle_t handle, mmap_assets_handle_t asset_
     return true;
 }
 
-static bool emote_load_icons(emote_handle_t handle, mmap_assets_handle_t asset_handle, cJSON *root)
+static bool emote_load_icons(emote_handle_t handle, cJSON *root)
 {
     if (!handle || !root) {
         return false;
@@ -336,12 +340,11 @@ static bool emote_load_icons(emote_handle_t handle, mmap_assets_handle_t asset_h
 
         const uint8_t *iconData = NULL;
         size_t iconSize = 0;
-        if (!emote_find_data_by_name(asset_handle, file->valuestring, &iconData, &iconSize)) {
+        if (!emote_find_data_by_name(handle, file->valuestring, &iconData, &iconSize)) {
             ESP_LOGE(TAG, "Failed to get icon data for: %s", file->valuestring);
             continue;
         }
 
-        // emote_save_icon_data(handle, asset_handle, name->valuestring, iconData, iconSize);
 
         icon_data_t *icon_data = (icon_data_t *)malloc(sizeof(icon_data_t));
         if (!icon_data) {
@@ -350,7 +353,6 @@ static bool emote_load_icons(emote_handle_t handle, mmap_assets_handle_t asset_h
 
         icon_data->data = iconData;
         icon_data->size = iconSize;
-        icon_data->handle = asset_handle;
 
         ESP_LOGI(TAG, "set icon data: %s", name->valuestring);
         emote_assets_table_set(handle->icon_data, name->valuestring, icon_data);
@@ -412,7 +414,7 @@ static bool emote_load_layouts(emote_handle_t handle, cJSON *root)
     return true;
 }
 
-static bool emote_load_fonts(emote_handle_t handle, mmap_assets_handle_t asset_handle, cJSON *root)
+static bool emote_load_fonts(emote_handle_t handle, cJSON *root)
 {
     if (!handle || !root) {
         return false;
@@ -428,12 +430,12 @@ static bool emote_load_fonts(emote_handle_t handle, mmap_assets_handle_t asset_h
 
     const uint8_t *fontData = NULL;
     size_t fontSize = 0;
-    if (!emote_find_data_by_name(asset_handle, fontsTextFile, &fontData, &fontSize)) {
+    if (!emote_find_data_by_name(handle, fontsTextFile, &fontData, &fontSize)) {
         ESP_LOGE(TAG, "Font file not found: %s", fontsTextFile);
         return false;
     }
 
-    const void *src_data = emote_acquire_data(handle, asset_handle, fontData, fontSize, &handle->font_cache);
+    const void *src_data = emote_acquire_data(handle, fontData, fontSize, &handle->font_cache);
     if (!src_data) {
         ESP_LOGE(TAG, "Failed to get font data");
         return false;
@@ -444,15 +446,15 @@ static bool emote_load_fonts(emote_handle_t handle, mmap_assets_handle_t asset_h
     return true;
 }
 
-static bool emote_load_assets_data(emote_handle_t handle, mmap_assets_handle_t asset_handle)
+static bool emote_load_assets_data(emote_handle_t handle)
 {
-    if (!handle || !asset_handle) {
+    if (!handle) {
         return false;
     }
 
     const uint8_t *asset_data = NULL;
     size_t asset_size = 0;
-    if (!emote_find_data_by_name(asset_handle, EMOTE_INDEX_JSON_FILENAME, &asset_data, &asset_size)) {
+    if (!emote_find_data_by_name(handle, EMOTE_INDEX_JSON_FILENAME, &asset_data, &asset_size)) {
         ESP_LOGE(TAG, "Failed to find %s in assets", EMOTE_INDEX_JSON_FILENAME);
         return false;
     }
@@ -460,7 +462,7 @@ static bool emote_load_assets_data(emote_handle_t handle, mmap_assets_handle_t a
     ESP_LOGI(TAG, "Found %s, size: %zu", EMOTE_INDEX_JSON_FILENAME, asset_size);
 
     void *internal_buf = NULL;
-    const void *src_data = emote_acquire_data(handle, asset_handle, asset_data, asset_size, &internal_buf);
+    const void *src_data = emote_acquire_data(handle, asset_data, asset_size, &internal_buf);
     if (!src_data) {
         ESP_LOGE(TAG, "Failed to resolve asset data");
         return false;
@@ -476,16 +478,16 @@ static bool emote_load_assets_data(emote_handle_t handle, mmap_assets_handle_t a
     }
 
     bool result = true;
-    if (!emote_load_emojis(handle, asset_handle, root)) {
+    if (!emote_load_emojis(handle, root)) {
         result = false;
     }
-    if (!emote_load_icons(handle, asset_handle, root)) {
+    if (!emote_load_icons(handle, root)) {
         result = false;
     }
     if (!emote_load_layouts(handle, root)) {
         result = false;
     }
-    if (!emote_load_fonts(handle, asset_handle, root)) {
+    if (!emote_load_fonts(handle, root)) {
         result = false;
     }
 
@@ -497,36 +499,6 @@ static bool emote_load_assets_data(emote_handle_t handle, mmap_assets_handle_t a
     emote_delete_boot_anim(handle);
 
     return result;
-}
-
-static bool emote_load_boot_anim(emote_handle_t handle, mmap_assets_handle_t asset_handle)
-{
-    if (!handle || !asset_handle) {
-        return false;
-    }
-
-    const uint8_t *anim_data = NULL;
-    size_t anim_size = 0;
-
-    int fileNum = mmap_assets_get_stored_files(asset_handle);
-    if (fileNum > 0) {
-        anim_data = mmap_assets_get_mem(asset_handle, 0);
-        anim_size = mmap_assets_get_size(asset_handle, 0);
-    }
-
-    if (!anim_data || anim_size == 0) {
-        ESP_LOGE(TAG, "Boot animation not available, anim_data: %p, anim_size: %zu", anim_data, anim_size);
-        return false;
-    }
-
-    const void *src_data = emote_acquire_data(handle, asset_handle, anim_data, anim_size, &handle->boot_anim_cache);
-    if (!src_data) {
-        ESP_LOGE(TAG, "Failed to get boot animation data");
-        gfx_emote_unlock(handle->gfx_emote_handle);
-        return false;
-    }
-
-    return emote_setup_boot_anim(handle, (uint8_t *)src_data, anim_size);
 }
 
 bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon)
@@ -545,28 +517,15 @@ bool emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji
     return emote_find_data_by_key(handle, handle->emoji_data, name, (void **)emoji);
 }
 
-bool emote_load_boot_anim_from_source(emote_handle_t handle, const emote_data_t *data)
-{
-    if (!handle || !data) {
-        return false;
-    }
-
-    if (!emote_load_assets_handle(handle, data, &handle->boot_assets_handle, "Loading boot anim")) {
-        return false;
-    }
-
-    return emote_load_boot_anim(handle, handle->boot_assets_handle);
-}
-
 bool emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *data)
 {
     if (!handle || !data) {
         return false;
     }
 
-    if (!emote_load_assets_handle(handle, data, &handle->emote_assets_handle, "Loading assets")) {
+    if (!emote_load_assets_handle(handle, data)) {
         return false;
     }
 
-    return emote_load_assets_data(handle, handle->emote_assets_handle);
+    return emote_load_assets_data(handle);
 }

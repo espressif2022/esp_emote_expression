@@ -14,21 +14,20 @@
 #include "expression_emote.h"
 #include "esp_mmap_assets.h"
 
-#include "emote_op.h"
-#include "emote_init.h"
-#include "emote_load.h"
-#include "emote_types.h"
+#include "emote_defs.h"
+#include "emote_assets.h"
+#include "emote_layout.h"
 
 // ===== Constants and Macros =====
 static const char *TAG = "ExpressionEmote";
 
 #define HIDE_OBJ(handle, obj_type) do { \
-    gfx_obj_t *obj = (handle)->gfx_objects[obj_type]; \
+    gfx_obj_t *obj = (handle)->def_objects[obj_type]; \
     if (obj) gfx_obj_set_visible(obj, false); \
 } while(0)
 
 #define SHOW_OBJ(handle, obj_type) do { \
-    gfx_obj_t *obj = (handle)->gfx_objects[obj_type]; \
+    gfx_obj_t *obj = (handle)->def_objects[obj_type]; \
     if (obj) gfx_obj_set_visible(obj, true); \
 } while(0)
 
@@ -47,11 +46,11 @@ typedef struct {
 // Helper functions
 static void **emote_get_cache_ptr_by_obj_type(emote_handle_t handle, emote_obj_type_t obj_type);
 static gfx_image_dsc_t *emote_get_img_dsc_by_obj_type(emote_handle_t handle, emote_obj_type_t obj_type);
-static void emote_set_eye_visibility(emote_handle_t handle, bool hide_eye);
+static void emote_set_eye_hidden(emote_handle_t handle, bool hidden);
 
 // UI helper functions
-static bool emote_set_icon_image(emote_handle_t handle, const char *name,
-                                 emote_obj_type_t obj_type, bool visible);
+static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type,
+                                 const char *name, bool visible);
 static bool emote_set_icon_animation(emote_handle_t handle, const char *name,
                                      emote_obj_type_t obj_type, uint8_t fps, bool loop);
 static bool emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type,
@@ -91,15 +90,15 @@ static void **emote_get_cache_ptr_by_obj_type(emote_handle_t handle, emote_obj_t
     }
 
     switch (obj_type) {
-    case EMOTE_OBJ_ANIM_LISTEN:
+    case EMOTE_DEF_OBJ_ANIM_LISTEN:
         return &handle->listen_anim_cache;
-    case EMOTE_OBJ_ANIM_EYE:
+    case EMOTE_DEF_OBJ_ANIM_EYE:
         return &handle->emoji_anim_cache;
-    case EMOTE_OBJ_ANIM_EMERG_DLG:
+    case EMOTE_DEF_OBJ_ANIM_EMERG_DLG:
         return &handle->emerg_dlg_cache;
-    case EMOTE_OBJ_ICON_STATUS:
+    case EMOTE_DEF_OBJ_ICON_STATUS:
         return &handle->tips_icon_cache;
-    case EMOTE_OBJ_ICON_CHARGE:
+    case EMOTE_DEF_OBJ_ICON_CHARGE:
         return &handle->charge_icon_cache;
     default:
         return NULL;
@@ -113,31 +112,33 @@ static gfx_image_dsc_t *emote_get_img_dsc_by_obj_type(emote_handle_t handle, emo
     }
 
     switch (obj_type) {
-    case EMOTE_OBJ_ICON_STATUS:
+    case EMOTE_DEF_OBJ_ICON_STATUS:
         return &handle->tips_img_dsc;
-    case EMOTE_OBJ_ICON_CHARGE:
+    case EMOTE_DEF_OBJ_ICON_CHARGE:
         return &handle->charge_img_dsc;
     default:
         return NULL;
     }
 }
 
-static void emote_set_eye_visibility(emote_handle_t handle, bool hide_eye)
+static void emote_set_eye_hidden(emote_handle_t handle, bool hidden)
 {
     if (!handle) {
         return;
     }
 
-    if (hide_eye) {
-        gfx_emote_lock(handle->gfx_emote_handle);
-        HIDE_OBJ(handle, EMOTE_OBJ_ANIM_EYE);
-        gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_emote_handle);
+    if (hidden) {
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
+    } else {
+        SHOW_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     }
+    gfx_emote_unlock(handle->gfx_emote_handle);
 }
 
 // UI helper functions
-static bool emote_set_icon_image(emote_handle_t handle, const char *name,
-                                 emote_obj_type_t obj_type, bool visible)
+static bool emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type,
+                                 const char *name, bool visible)
 {
     if (!handle || !name) {
         return false;
@@ -148,7 +149,7 @@ static bool emote_set_icon_image(emote_handle_t handle, const char *name,
         return false;
     }
 
-    gfx_obj_t *obj = handle->gfx_objects[obj_type];
+    gfx_obj_t *obj = handle->def_objects[obj_type];
     if (!obj) {
         ESP_LOGE(TAG, "object not found");
         return false;
@@ -172,7 +173,7 @@ static bool emote_set_icon_image(emote_handle_t handle, const char *name,
     }
 
     gfx_emote_lock(handle->gfx_emote_handle);
-    const void *src_data = emote_acquire_data(handle, icon->handle, icon->data, icon->size, cache_ptr);
+    const void *src_data = emote_acquire_data(handle, icon->data, icon->size, cache_ptr);
     if (!src_data) {
         ESP_LOGE(TAG, "Failed to acquire icon data");
         gfx_emote_unlock(handle->gfx_emote_handle);
@@ -201,7 +202,7 @@ static bool emote_set_icon_animation(emote_handle_t handle, const char *name,
         return false;
     }
 
-    gfx_obj_t *obj = handle->gfx_objects[obj_type];
+    gfx_obj_t *obj = handle->def_objects[obj_type];
     if (!obj) {
         return false;
     }
@@ -213,7 +214,7 @@ static bool emote_set_icon_animation(emote_handle_t handle, const char *name,
     }
 
     gfx_emote_lock(handle->gfx_emote_handle);
-    const void *src_data = emote_acquire_data(handle, icon->handle, icon->data, icon->size, cache_ptr);
+    const void *src_data = emote_acquire_data(handle, icon->data, icon->size, cache_ptr);
     if (!src_data) {
         ESP_LOGE(TAG, "Failed to acquire animation data");
         gfx_emote_unlock(handle->gfx_emote_handle);
@@ -235,7 +236,7 @@ static bool emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_typ
         return false;
     }
 
-    gfx_obj_t *obj = handle->gfx_objects[obj_type];
+    gfx_obj_t *obj = handle->def_objects[obj_type];
     if (!obj) {
         return false;
     }
@@ -262,7 +263,7 @@ static bool emote_set_emoji_animation(emote_handle_t handle, const char *name,
     ESP_LOGD(TAG, "Setting emoji: %s (fps=%d, loop=%s)",
              name, emoji->fps, emoji->loop ? "true" : "false");
 
-    gfx_obj_t *obj = handle->gfx_objects[obj_type];
+    gfx_obj_t *obj = handle->def_objects[obj_type];
     if (!obj) {
         ESP_LOGE(TAG, "%s object not found", name);
         return false;
@@ -275,7 +276,7 @@ static bool emote_set_emoji_animation(emote_handle_t handle, const char *name,
     }
 
     gfx_emote_lock(handle->gfx_emote_handle);
-    const void *src_data = emote_acquire_data(handle, emoji->handle, emoji->data, emoji->size, cache_ptr);
+    const void *src_data = emote_acquire_data(handle, emoji->data, emoji->size, cache_ptr);
     if (!src_data) {
         ESP_LOGE(TAG, "Failed to acquire %s animation data", name);
         gfx_emote_unlock(handle->gfx_emote_handle);
@@ -283,7 +284,7 @@ static bool emote_set_emoji_animation(emote_handle_t handle, const char *name,
     }
 
     gfx_anim_set_src(obj, src_data, emoji->size);
-    gfx_anim_set_segment(obj, 0, 0xFFFF, emoji->fps > 0 ? emoji->fps : EMOTE_DEFAULT_ANIMATION_FPS, emoji->loop);
+    gfx_anim_set_segment(obj, 0, 0xFFFF, emoji->fps > 0 ? emoji->fps : EMOTE_DEF_ANIMATION_FPS, emoji->loop);
     gfx_anim_start(obj);
     gfx_obj_set_visible(obj, true);
 
@@ -302,16 +303,16 @@ static bool emote_handle_idle_event(emote_handle_t handle, const char *message)
 
 static bool emote_handle_listen_event(emote_handle_t handle, const char *message)
 {
-    emote_set_icon_animation(handle, EMOTE_ICON_LISTEN, EMOTE_OBJ_ANIM_LISTEN, 15, true);
-    emote_set_icon_image(handle, EMOTE_ICON_MIC, EMOTE_OBJ_ICON_STATUS, true);
+    emote_set_icon_animation(handle, EMOTE_ICON_LISTEN, EMOTE_DEF_OBJ_ANIM_LISTEN, 15, true);
+    emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_MIC, true);
     return true;
 }
 
 static bool emote_handle_speak_event(emote_handle_t handle, const char *message)
 {
-    emote_set_label_text(handle, EMOTE_OBJ_LABEL_TOAST, message);
-    emote_set_icon_image(handle, EMOTE_ICON_SPEAKER, EMOTE_OBJ_ICON_STATUS, true);
-    gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_LABEL_TOAST];
+    emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_TOAST, message);
+    emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_SPEAKER, true);
+    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST];
     if (obj) {
         gfx_label_set_snap_loop(obj, false);
     }
@@ -320,9 +321,9 @@ static bool emote_handle_speak_event(emote_handle_t handle, const char *message)
 
 static bool emote_handle_sys_set_event(emote_handle_t handle, const char *message)
 {
-    emote_set_label_text(handle, EMOTE_OBJ_LABEL_TOAST, message);
-    emote_set_icon_image(handle, EMOTE_ICON_TIPS, EMOTE_OBJ_ICON_STATUS, true);
-    gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_LABEL_TOAST];
+    emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_TOAST, message);
+    emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_TIPS, true);
+    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST];
     if (obj) {
         gfx_label_set_snap_loop(obj, true);
     }
@@ -332,10 +333,10 @@ static bool emote_handle_sys_set_event(emote_handle_t handle, const char *messag
 static bool emote_handle_qrcode_set_event(emote_handle_t handle, const char *message)
 {
     ESP_LOGI(TAG, "handle_qrcode_set_event: %s", message);
-    emote_set_label_text(handle, EMOTE_OBJ_LABEL_TOAST, message);
-    emote_set_icon_image(handle, EMOTE_ICON_TIPS, EMOTE_OBJ_ICON_STATUS, true);
-    HIDE_OBJ(handle, EMOTE_OBJ_ANIM_EYE);
-    gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_LABEL_TOAST];
+    emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_TOAST, message);
+    emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_TIPS, true);
+    HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
+    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST];
     if (obj) {
         gfx_label_set_snap_loop(obj, true);
     }
@@ -385,9 +386,9 @@ bool emote_set_bat_status(emote_handle_t handle)
     if (handle->battery_percent >= 0) {
         char percent_str[16];
         snprintf(percent_str, sizeof(percent_str), "%d", handle->battery_percent);
-        emote_set_icon_image(handle, EMOTE_ICON_BATTERY_BG, EMOTE_OBJ_ICON_STATUS, true);
-        emote_set_label_text(handle, EMOTE_OBJ_LABEL_BATTERY, percent_str);
-        emote_set_icon_image(handle, EMOTE_ICON_BATTERY_CHARGE, EMOTE_OBJ_ICON_CHARGE, handle->battery_is_charging);
+        emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_BATTERY_BG, true);
+        emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_BATTERY, percent_str);
+        emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_CHARGE, EMOTE_ICON_BATTERY_CHARGE, handle->battery_is_charging);
     }
     return true;
 }
@@ -398,13 +399,13 @@ bool emote_set_label_clock(emote_handle_t handle)
         return false;
     }
 
-    gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_LABEL_CLOCK];
+    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_CLOCK];
     if (!obj) {
         ESP_LOGE(TAG, "CLOCK_LABEL object not found");
         return false;
     }
 
-    gfx_timer_handle_t timer = handle->gfx_objects[EMOTE_OBJ_TIMER_STATUS];
+    gfx_timer_handle_t timer = handle->def_objects[EMOTE_DEF_OBJ_TIMER_STATUS];
     if (!timer) {
         ESP_LOGE(TAG, "CLOCK_TIMER object not found");
         return false;
@@ -431,8 +432,8 @@ bool emote_set_label_clock(emote_handle_t handle)
 
 bool emote_set_anim_emoji(emote_handle_t handle, const char *name)
 {
-    emote_set_eye_visibility(handle, false);
-    if (!emote_set_emoji_animation(handle, name, EMOTE_OBJ_ANIM_EYE)) {
+    emote_set_eye_hidden(handle, false);
+    if (!emote_set_emoji_animation(handle, name, EMOTE_DEF_OBJ_ANIM_EYE)) {
         return false;
     }
     return true;
@@ -440,8 +441,8 @@ bool emote_set_anim_emoji(emote_handle_t handle, const char *name)
 
 bool emote_set_dialog_anim(emote_handle_t handle, const char *name)
 {
-    emote_set_eye_visibility(handle, true);
-    if (!emote_set_emoji_animation(handle, name, EMOTE_OBJ_ANIM_EMERG_DLG)) {
+    emote_set_eye_hidden(handle, true);
+    if (!emote_set_emoji_animation(handle, name, EMOTE_DEF_OBJ_ANIM_EMERG_DLG)) {
         return false;
     }
 
@@ -454,7 +455,7 @@ bool emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text)
     if (!handle || !qrcode_text) {
         return false;
     }
-    gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_QRCODE];
+    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_QRCODE];
     if (!obj) {
         ESP_LOGE(TAG, "QRCODE object not found");
         return false;
@@ -480,8 +481,8 @@ bool emote_stop_anim_dialog(emote_handle_t handle)
         handle->dialog_timer = NULL;
     }
 
-    SHOW_OBJ(handle, EMOTE_OBJ_ANIM_EYE);
-    HIDE_OBJ(handle, EMOTE_OBJ_ANIM_EMERG_DLG);
+    SHOW_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
+    HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EMERG_DLG);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
     if (handle->emerg_dlg_cache) {
@@ -552,14 +553,14 @@ bool emote_set_event_msg(emote_handle_t handle, const char *event, const char *m
 
     // Hide all UI elements for events that don't skip hiding
     if (!entry->skip_hide_ui) {
-        HIDE_OBJ(handle, EMOTE_OBJ_ANIM_LISTEN);
-        HIDE_OBJ(handle, EMOTE_OBJ_LABEL_CLOCK);
-        HIDE_OBJ(handle, EMOTE_OBJ_LABEL_TOAST);
-        HIDE_OBJ(handle, EMOTE_OBJ_LABEL_BATTERY);
-        HIDE_OBJ(handle, EMOTE_OBJ_ICON_CHARGE);
-        HIDE_OBJ(handle, EMOTE_OBJ_ICON_STATUS);
-        HIDE_OBJ(handle, EMOTE_OBJ_QRCODE);
-        gfx_obj_t *obj_timer = handle->gfx_objects[EMOTE_OBJ_TIMER_STATUS];
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_LISTEN);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_LABEL_CLOCK);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_LABEL_TOAST);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_LABEL_BATTERY);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_ICON_CHARGE);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_ICON_STATUS);
+        HIDE_OBJ(handle, EMOTE_DEF_OBJ_QRCODE);
+        gfx_obj_t *obj_timer = handle->def_objects[EMOTE_DEF_OBJ_TIMER_STATUS];
         if (obj_timer) {
             gfx_timer_pause((gfx_timer_handle_t)obj_timer);
         }
@@ -571,42 +572,6 @@ bool emote_set_event_msg(emote_handle_t handle, const char *event, const char *m
     gfx_emote_unlock(handle->gfx_emote_handle);
 
     return result;
-}
-
-bool emote_wait_boot_anim_stop(emote_handle_t handle, bool delete_anim)
-{
-    if (!handle) {
-        return false;
-    }
-
-    ESP_LOGI(TAG, "Waiting for boot animation to stop");
-
-    while (!handle->boot_anim_completed) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-
-    if (delete_anim) {
-        gfx_emote_lock(handle->gfx_emote_handle);
-        if (handle->boot_anim_cache) {
-            free(handle->boot_anim_cache);
-            handle->boot_anim_cache = NULL;
-        }
-
-        if (handle->boot_assets_handle) {
-            mmap_assets_del(handle->boot_assets_handle);
-            handle->boot_assets_handle = NULL;
-        }
-
-        gfx_emote_set_bg_color(handle->gfx_emote_handle, GFX_COLOR_HEX(0x000000));
-        gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_ANIM_BOOT];
-        if (obj) {
-            gfx_obj_delete(obj);
-            handle->gfx_objects[EMOTE_OBJ_ANIM_BOOT] = NULL;
-        }
-        gfx_emote_unlock(handle->gfx_emote_handle);
-    }
-
-    return true;
 }
 
 bool emote_notify_flush_finished(emote_handle_t handle)

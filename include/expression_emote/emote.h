@@ -9,30 +9,56 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "gfx.h"
-#include "esp_mmap_assets.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ===== EVENT TYPE CONSTANTS =====
-#define EMOTE_MGR_EVT_IDLE        "evt_idle"
-#define EMOTE_MGR_EVT_SPEAK       "evt_speak"
-#define EMOTE_MGR_EVT_LISTEN      "evt_listen"
-#define EMOTE_MGR_EVT_SYS         "evt_sys"
-#define EMOTE_MGR_EVT_SET         "evt_set"
-#define EMOTE_MGR_EVT_BAT         "evt_bat"
-#define EMOTE_MGR_EVT_QRCODE      "evt_qrcode"
+/**
+ * @brief Event type constants
+ *
+ * These constants define the event types used by the emote manager.
+ */
+#define EMOTE_MGR_EVT_IDLE              "evt_idle"
+#define EMOTE_MGR_EVT_SPEAK             "evt_speak"
+#define EMOTE_MGR_EVT_LISTEN            "evt_listen"
+#define EMOTE_MGR_EVT_SYS               "evt_sys"
+#define EMOTE_MGR_EVT_SET               "evt_set"
+#define EMOTE_MGR_EVT_BAT               "evt_bat"
+#define EMOTE_MGR_EVT_QRCODE            "evt_qrcode"
+
+/**
+ * @brief UI element name constants
+ *
+ * These are default UI element name constants that define the standard element names
+ * used by the emote system. These can be used as default identifiers for UI elements.
+ */
+#define EMT_DEF_ELEM_BOOT_ANIM          "boot_anim"
+#define EMT_DEF_ELEM_EYE_ANIM           "eye_anim"
+#define EMT_DEF_ELEM_EMERG_DLG          "emerg_dlg"
+#define EMT_DEF_ELEM_TOAST_LABEL        "toast_label"
+#define EMT_DEF_ELEM_CLOCK_LABEL        "clock_label"
+#define EMT_DEF_ELEM_LISTEN_ANIM        "listen_anim"
+#define EMT_DEF_ELEM_STATUS_ICON        "status_icon"
+#define EMT_DEF_ELEM_CHARGE_ICON        "charge_icon"
+#define EMT_DEF_ELEM_BAT_LEFT_LABEL     "battery_label"
+#define EMT_DEF_ELEM_TIMER_STATUS       "clock_timer"
+#define EMT_DEF_ELEM_QRCODE             "qrcode"
+
+/**
+ * @brief Object type strings
+ *
+ * These are user-customizable object type strings that define the types of UI objects
+ * that can be created and managed by the emote system.
+ */
+#define EMOTE_OBJ_TYPE_ANIM             "anim"
+#define EMOTE_OBJ_TYPE_IMAGE            "image"
+#define EMOTE_OBJ_TYPE_LABEL            "label"
+#define EMOTE_OBJ_TYPE_QRCODE           "qrcode"
+#define EMOTE_OBJ_TYPE_TIMER            "timer"
 
 // ===== OPAQUE HANDLE =====
 typedef struct emote_s *emote_handle_t;
-
-// ===== OBJECT TYPE STRINGS =====
-#define EMOTE_OBJ_TYPE_ANIM    "anim"
-#define EMOTE_OBJ_TYPE_IMAGE   "image"
-#define EMOTE_OBJ_TYPE_LABEL   "label"
-#define EMOTE_OBJ_TYPE_QRCODE  "qrcode"
-#define EMOTE_OBJ_TYPE_TIMER   "timer"
 
 // ===== CONFIGURATION STRUCTURES =====
 typedef enum {
@@ -78,7 +104,6 @@ typedef struct {
 typedef struct icon_data_s {
     const void *data;
     size_t size;
-    mmap_assets_handle_t handle;
 } icon_data_t;
 
 typedef struct emoji_data_s {
@@ -86,7 +111,6 @@ typedef struct emoji_data_s {
     size_t size;
     uint8_t fps;
     bool loop;
-    mmap_assets_handle_t handle;
 } emoji_data_t;
 
 // ===== API FUNCTIONS =====
@@ -160,22 +184,6 @@ bool emote_stop_anim_dialog(emote_handle_t handle);
  * @return true on success, false on failure
  */
 bool emote_set_event_msg(emote_handle_t handle, const char *event, const char *message);
-
-/**
- * @brief Wait for boot animation to complete
- * @param handle Handle to emote manager
- * @param delete_anim Whether to delete animation after completion
- * @return true on success, false on failure
- */
-bool emote_wait_boot_anim_stop(emote_handle_t handle, bool delete_anim);
-
-/**
- * @brief Load and start boot animation from source
- * @param handle Handle to emote manager
- * @param data Source data structure
- * @return true on success, false on failure
- */
-bool emote_load_boot_anim_from_source(emote_handle_t handle, const emote_data_t *data);
 
 /**
  * @brief Load assets from source
