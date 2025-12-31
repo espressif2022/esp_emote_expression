@@ -7,6 +7,7 @@
 #pragma once
 
 #include "emote_defs.h"
+#include "esp_err.h"
 
 // Forward declaration for cJSON (only pointer types used in header)
 typedef struct cJSON cJSON;
@@ -44,10 +45,10 @@ void emote_delete_boot_anim(emote_handle_t handle);
  * @param[in]  fontData  Font data buffer
  *
  * @return
- *       - true   On success
- *       - false  Fail to apply fonts
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_apply_fonts(emote_handle_t handle, const uint8_t *fontData);
+esp_err_t emote_apply_fonts(emote_handle_t handle, const uint8_t *fontData);
 
 /**
  * @brief  Apply label layout configuration from JSON
@@ -57,10 +58,10 @@ bool emote_apply_fonts(emote_handle_t handle, const uint8_t *fontData);
  * @param[in]  label   JSON object containing label configuration
  *
  * @return
- *       - true   On success
- *       - false  Fail to apply label layout
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *label);
+esp_err_t emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *label);
 
 /**
  * @brief  Apply image layout configuration from JSON
@@ -70,10 +71,10 @@ bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *la
  * @param[in]  image   JSON object containing image configuration
  *
  * @return
- *       - true   On success
- *       - false  Fail to apply image layout
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_apply_image_layout(emote_handle_t handle, const char *name, cJSON *image);
+esp_err_t emote_apply_image_layout(emote_handle_t handle, const char *name, cJSON *image);
 
 /**
  * @brief  Apply timer layout configuration from JSON
@@ -83,10 +84,10 @@ bool emote_apply_image_layout(emote_handle_t handle, const char *name, cJSON *im
  * @param[in]  timer   JSON object containing timer configuration
  *
  * @return
- *       - true   On success
- *       - false  Fail to apply timer layout
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *timer);
+esp_err_t emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *timer);
 
 /**
  * @brief  Apply animation layout configuration from JSON
@@ -96,10 +97,10 @@ bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *ti
  * @param[in]  animation  JSON object containing animation configuration
  *
  * @return
- *       - true   On success
- *       - false  Fail to apply animation layout
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *animation);
+esp_err_t emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *animation);
 
 /**
  * @brief  Apply QRCode layout configuration from JSON
@@ -109,10 +110,10 @@ bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *ani
  * @param[in]  qrcode  JSON object containing QRCode configuration
  *
  * @return
- *       - true   On success
- *       - false  Fail to apply QRCode layout
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *qrcode);
+esp_err_t emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *qrcode);
 
 // ===== UI Operation Functions =====
 /**
@@ -121,10 +122,10 @@ bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *q
  * @param[in]  handle  Emote handle
  *
  * @return
- *       - true   On success
- *       - false  Fail to update clock label
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_set_label_clock(emote_handle_t handle);
+esp_err_t emote_set_label_clock(emote_handle_t handle);
 
 /**
  * @brief  Update battery status display (percentage and charging icon)
@@ -132,10 +133,10 @@ bool emote_set_label_clock(emote_handle_t handle);
  * @param[in]  handle  Emote handle
  *
  * @return
- *       - true   On success
- *       - false  Fail to update battery status
+ *       - ESP_OK  On success
+ *       - Other   Error code on failure
  */
-bool emote_set_bat_status(emote_handle_t handle);
+esp_err_t emote_set_bat_status(emote_handle_t handle);
 
 /**
  * @brief  Create object by name

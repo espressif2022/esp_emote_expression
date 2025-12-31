@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "esp_err.h"
 #include "gfx.h"
 
 #ifdef __cplusplus
@@ -142,72 +143,72 @@ bool emote_is_initialized(emote_handle_t handle);
  * @brief Set emoji animation on eye object
  * @param handle Handle to emote manager
  * @param name Name of the emoji animation
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_set_anim_emoji(emote_handle_t handle, const char *name);
+esp_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name);
 
 /**
  * @brief Set QR code data
  * @param handle Handle to emote manager
  * @param qrcode_text QR code text
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text);
+esp_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text);
 
 /**
  * @brief Set emergency dialog animation
  * @param handle Handle to emote manager
  * @param name Name of the emoji animation
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_set_dialog_anim(emote_handle_t handle, const char *name);
+esp_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name);
 
 /**
  * @brief Insert emergency dialog animation with auto-stop timer
  * @param handle Handle to emote manager
  * @param name Name of the emoji animation
  * @param duration_ms Duration in milliseconds before auto-stopping
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms);
+esp_err_t emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms);
 
 /**
  * @brief Stop emergency dialog animation
  * @param handle Handle to emote manager
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_stop_anim_dialog(emote_handle_t handle);
+esp_err_t emote_stop_anim_dialog(emote_handle_t handle);
 
 /**
  * @brief Set system event with message
  * @param handle Handle to emote manager
  * @param event Event type string
  * @param message Message string
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_set_event_msg(emote_handle_t handle, const char *event, const char *message);
+esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message);
 
 /**
  * @brief Load assets from source
  * @param handle Handle to emote manager
  * @param data Source data structure
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *data);
+esp_err_t emote_load_assets_from_source(emote_handle_t handle, const emote_data_t *data);
 
 /**
  * @brief Notify that flush operation is finished
  * @param handle Handle to emote manager
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_notify_flush_finished(emote_handle_t handle);
+esp_err_t emote_notify_flush_finished(emote_handle_t handle);
 
 /**
  * @brief Notify that all refresh operation is finished
  * @param handle Handle to emote manager
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_notify_all_refresh(emote_handle_t handle);
+esp_err_t emote_notify_all_refresh(emote_handle_t handle);
 
 /**
  * @brief Get graphics object by name
@@ -231,18 +232,18 @@ gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, con
  * @param handle Handle to emote manager
  * @param name Icon name
  * @param icon Icon data pointer (output parameter)
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon);
+esp_err_t emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon);
 
 /**
  * @brief Get emoji data by name
  * @param handle Handle to emote manager
  * @param name Emoji name
  * @param emoji Emoji data pointer (output parameter)
- * @return true on success, false on failure
+ * @return ESP_OK on success, error code on failure
  */
-bool emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji);
+esp_err_t emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji);
 
 #ifdef __cplusplus
 }

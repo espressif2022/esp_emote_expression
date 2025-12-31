@@ -118,6 +118,7 @@ emote_handle_t emote_init(const emote_config_t *config)
     gfx_emote_unlock(handle->gfx_emote_handle);
     ESP_LOGI(TAG, "Create default objects: boot: [%p], label: [%p]", boot_obj, obj_default);
     handle->is_initialized = true;
+    (void)ret;  // ret is used by ESP_GOTO_ON_FALSE macro but not returned by this function
     return handle;
 
 error_unlock:
