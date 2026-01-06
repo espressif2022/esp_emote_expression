@@ -9,41 +9,40 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "expression_emote.h"
-#include "emote_types.h"
+#include "emote_defs.h"
+#include "emote_table.h"
+#include "emote_layout.h"
 #include "widget/gfx_font_lvgl.h"
 #include "cJSON.h"
-#include "emote_setup.h"
-#include "emote_load.h"
-#include "emote_init.h"
-#include "emote_op.h"
 
-static const char *TAG = "ExpressionEmote";
+// ===== Constants and Macros =====
+static const char *TAG = "Expression_setup";
 
 LV_FONT_DECLARE(font_maison_neue_book_12);
 LV_FONT_DECLARE(font_maison_neue_book_26);
+LV_FONT_DECLARE(font_puhui_basic_20_4);
 
-// ===== Object Creation Table Definitions =====
+#define OBJ_TYPE_STR_TABLE_SIZE (sizeof(obj_type_str_table) / sizeof(obj_type_str_table[0]))
+#define OBJ_CREATION_TABLE_SIZE (sizeof(obj_creation_table) / sizeof(obj_creation_table[0]))
+
+// ===== Type Definitions =====
 typedef gfx_obj_t *(*obj_creator_t)(gfx_handle_t gfx_handle, emote_handle_t handle);
+typedef void (*obj_configurator_t)(gfx_obj_t *obj, emote_handle_t handle);
 
-// Object configurator function type
-typedef void (*obj_configurator_t)(gfx_obj_t *obj);
-
-// Object creation table entry
 typedef struct {
     emote_obj_type_t type;
     obj_creator_t creator;
     obj_configurator_t configurator;
 } obj_creation_entry_t;
 
-// Type string to creator mapping (for generic object creation)
 typedef struct {
     const char *type_str;
     obj_creator_t creator;
     obj_configurator_t configurator;
 } obj_type_str_entry_t;
 
-// Helper functions
 typedef struct {
     const char *name;
     int value;
@@ -64,22 +63,61 @@ typedef struct {
     emote_obj_type_t value;
 } element_type_map_t;
 
-// Forward declarations for object creators
+// ===== Static Function Declarations =====
+// Object creators
 static gfx_obj_t *emote_create_anim_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 static gfx_obj_t *emote_create_img_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 static gfx_obj_t *emote_create_qrcode_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 static gfx_obj_t *emote_create_label_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 static gfx_obj_t *emote_create_timer_obj(gfx_handle_t gfx_handle, emote_handle_t handle);
 
-// Forward declarations for object configurators
-static void emote_config_anim_obj(gfx_obj_t *obj);
-static void emote_config_img_obj(gfx_obj_t *obj);
-static void emote_config_qrcode_obj(gfx_obj_t *obj);
-static void emote_config_label_obj(gfx_obj_t *obj);
-static void emote_config_label_toast_obj(gfx_obj_t *obj);
-static void emote_config_label_clock_obj(gfx_obj_t *obj);
-static void emote_config_label_battery_obj(gfx_obj_t *obj);
+// Object configurators
+static void emote_config_anim_obj(gfx_obj_t *obj, emote_handle_t handle);
+static void emote_config_img_obj(gfx_obj_t *obj, emote_handle_t handle);
+static void emote_config_qrcode_obj(gfx_obj_t *obj, emote_handle_t handle);
+static void emote_config_label_obj(gfx_obj_t *obj, emote_handle_t handle);
+static void emote_config_label_toast_obj(gfx_obj_t *obj, emote_handle_t handle);
+static void emote_config_label_clock_obj(gfx_obj_t *obj, emote_handle_t handle);
+static void emote_config_label_battery_obj(gfx_obj_t *obj, emote_handle_t handle);
 
+// Helper functions
+static int emote_convert_align_str(const char *str);
+static gfx_text_align_t emote_convert_text_align_str(const char *str);
+static gfx_label_long_mode_t emote_convert_long_mode_str(const char *str);
+static emote_obj_type_t emote_get_element_type(const char *name);
+static void emote_status_timer_callback(void *data);
+
+// Object management
+static gfx_obj_t *emote_create_object(emote_handle_t handle, emote_obj_type_t type);
+static emote_custom_obj_entry_t *emote_find_custom_obj(emote_handle_t handle, const char *name);
+static esp_err_t emote_register_custom_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj);
+
+// ===== Static Variables =====
+static const obj_type_str_entry_t obj_type_str_table[] = {
+    { EMOTE_OBJ_TYPE_ANIM,    emote_create_anim_obj,  emote_config_anim_obj  },
+    { EMOTE_OBJ_TYPE_IMAGE,   emote_create_img_obj,   emote_config_img_obj   },
+    { EMOTE_OBJ_TYPE_LABEL,   emote_create_label_obj, emote_config_label_obj },
+    { EMOTE_OBJ_TYPE_QRCODE,  emote_create_qrcode_obj, emote_config_qrcode_obj },
+    { EMOTE_OBJ_TYPE_TIMER,   emote_create_timer_obj, NULL                   },
+};
+
+static const obj_creation_entry_t obj_creation_table[] = {
+    { EMOTE_DEF_OBJ_LEBAL_DEFAULT,  emote_create_label_obj, emote_config_label_obj          },
+    { EMOTE_DEF_OBJ_ANIM_EYE,       emote_create_anim_obj,  emote_config_anim_obj          },
+    { EMOTE_DEF_OBJ_ANIM_LISTEN,    emote_create_anim_obj,  emote_config_anim_obj          },
+    { EMOTE_DEF_OBJ_ANIM_EMERG_DLG, emote_create_anim_obj,  emote_config_anim_obj          },
+    { EMOTE_DEF_OBJ_ICON_STATUS,    emote_create_img_obj,   emote_config_img_obj           },
+    { EMOTE_DEF_OBJ_ICON_CHARGE,    emote_create_img_obj,   emote_config_img_obj           },
+    { EMOTE_DEF_OBJ_LABEL_TOAST,    emote_create_label_obj, emote_config_label_toast_obj   },
+    { EMOTE_DEF_OBJ_LABEL_CLOCK,    emote_create_label_obj, emote_config_label_clock_obj  },
+    { EMOTE_DEF_OBJ_LABEL_BATTERY,  emote_create_label_obj, emote_config_label_battery_obj },
+    { EMOTE_DEF_OBJ_QRCODE,         emote_create_qrcode_obj, emote_config_qrcode_obj       },
+    { EMOTE_DEF_OBJ_TIMER_STATUS,   emote_create_timer_obj, NULL                           },
+};
+
+// ===== Static Function Implementations =====
+
+// Helper functions
 static int emote_convert_align_str(const char *str)
 {
     if (!str) {
@@ -166,21 +204,21 @@ static gfx_label_long_mode_t emote_convert_long_mode_str(const char *str)
 static emote_obj_type_t emote_get_element_type(const char *name)
 {
     if (!name) {
-        return EMOTE_OBJ_MAX;
+        return EMOTE_DEF_OBJ_MAX;
     }
 
     static const element_type_map_t element_type_map[] = {
-        { EMOTE_ELEMENT_BOOT_ANIM,      EMOTE_OBJ_ANIM_BOOT      },
-        { EMOTE_ELEMENT_EYE_ANIM,        EMOTE_OBJ_ANIM_EYE       },
-        { EMOTE_ELEMENT_EMERG_DLG,       EMOTE_OBJ_ANIM_EMERG_DLG },
-        { EMOTE_ELEMENT_TOAST_LABEL,     EMOTE_OBJ_LABEL_TOAST    },
-        { EMOTE_ELEMENT_CLOCK_LABEL,     EMOTE_OBJ_LABEL_CLOCK    },
-        { EMOTE_ELEMENT_LISTEN_ANIM,     EMOTE_OBJ_ANIM_LISTEN    },
-        { EMOTE_ELEMENT_STATUS_ICON,     EMOTE_OBJ_ICON_STATUS    },
-        { EMOTE_ELEMENT_CHARGE_ICON,     EMOTE_OBJ_ICON_CHARGE    },
-        { EMOTE_ELEMENT_BAT_LEFT_LABEL,  EMOTE_OBJ_LABEL_BATTERY  },
-        { EMOTE_ELEMENT_TIMER_STATUS,    EMOTE_OBJ_TIMER_STATUS   },
-        { EMOTE_ELEMENT_QRCODE,          EMOTE_OBJ_QRCODE         },
+        { EMT_DEF_ELEM_DEFAULT_LABEL,  EMOTE_DEF_OBJ_LEBAL_DEFAULT  },
+        { EMT_DEF_ELEM_EYE_ANIM,        EMOTE_DEF_OBJ_ANIM_EYE       },
+        { EMT_DEF_ELEM_EMERG_DLG,       EMOTE_DEF_OBJ_ANIM_EMERG_DLG },
+        { EMT_DEF_ELEM_TOAST_LABEL,     EMOTE_DEF_OBJ_LABEL_TOAST    },
+        { EMT_DEF_ELEM_CLOCK_LABEL,     EMOTE_DEF_OBJ_LABEL_CLOCK    },
+        { EMT_DEF_ELEM_LISTEN_ANIM,     EMOTE_DEF_OBJ_ANIM_LISTEN    },
+        { EMT_DEF_ELEM_STATUS_ICON,     EMOTE_DEF_OBJ_ICON_STATUS    },
+        { EMT_DEF_ELEM_CHARGE_ICON,     EMOTE_DEF_OBJ_ICON_CHARGE    },
+        { EMT_DEF_ELEM_BAT_LEFT_LABEL,  EMOTE_DEF_OBJ_LABEL_BATTERY  },
+        { EMT_DEF_ELEM_TIMER_STATUS,    EMOTE_DEF_OBJ_TIMER_STATUS   },
+        { EMT_DEF_ELEM_QRCODE,          EMOTE_DEF_OBJ_QRCODE         },
     };
 
     for (size_t i = 0; i < sizeof(element_type_map) / sizeof(element_type_map[0]); i++) {
@@ -189,19 +227,19 @@ static emote_obj_type_t emote_get_element_type(const char *name)
         }
     }
 
-    return EMOTE_OBJ_MAX;
+    return EMOTE_DEF_OBJ_MAX;
 }
 
-static void emote_status_timer_callback(void *user_data)
+static void emote_status_timer_callback(void *data)
 {
-    emote_handle_t handle = (emote_handle_t)user_data;
+    emote_handle_t handle = (emote_handle_t)data;
     if (handle) {
         emote_set_label_clock(handle);
         emote_set_bat_status(handle);
     }
 }
 
-// ===== Object Creator Implementations =====
+// Object creators
 static gfx_obj_t *emote_create_anim_obj(gfx_handle_t gfx_handle, emote_handle_t handle)
 {
     (void)handle;
@@ -231,35 +269,26 @@ static gfx_obj_t *emote_create_timer_obj(gfx_handle_t gfx_handle, emote_handle_t
     return (gfx_obj_t *)gfx_timer_create(gfx_handle, emote_status_timer_callback, 1000, handle);
 }
 
-// Type string to creator mapping table
-static const obj_type_str_entry_t obj_type_str_table[] = {
-    { "anim",    emote_create_anim_obj,  emote_config_anim_obj  },
-    { "image",   emote_create_img_obj,   emote_config_img_obj   },
-    { "img",     emote_create_img_obj,   emote_config_img_obj   },
-    { "label",   emote_create_label_obj, emote_config_label_obj },
-    { "qrcode",  emote_create_qrcode_obj, emote_config_qrcode_obj },
-    { "timer",   emote_create_timer_obj, NULL                   },
-};
-
-#define OBJ_TYPE_STR_TABLE_SIZE (sizeof(obj_type_str_table) / sizeof(obj_type_str_table[0]))
-
-// ===== Object Configurator Implementations =====
-static void emote_config_anim_obj(gfx_obj_t *obj)
+// Object configurators
+static void emote_config_anim_obj(gfx_obj_t *obj, emote_handle_t handle)
 {
+    (void)handle;
     if (obj) {
         gfx_obj_set_pos(obj, 0, 0);
     }
 }
 
-static void emote_config_img_obj(gfx_obj_t *obj)
+static void emote_config_img_obj(gfx_obj_t *obj, emote_handle_t handle)
 {
+    (void)handle;
     if (obj) {
         gfx_obj_set_visible(obj, false);
     }
 }
 
-static void emote_config_qrcode_obj(gfx_obj_t *obj)
+static void emote_config_qrcode_obj(gfx_obj_t *obj, emote_handle_t handle)
 {
+    (void)handle;
     if (obj) {
         // TODO: Implement gfx_qrcode_set_size if available
         // gfx_qrcode_set_size(obj, 150);
@@ -267,103 +296,91 @@ static void emote_config_qrcode_obj(gfx_obj_t *obj)
     }
 }
 
-static void emote_config_label_obj(gfx_obj_t *obj)
+static void emote_config_label_obj(gfx_obj_t *obj, emote_handle_t handle)
 {
-    if (!obj) {
+    if (!obj || !handle) {
         return;
     }
 
     // Set default label properties
-    gfx_obj_set_size(obj, EMOTE_DEFAULT_LABEL_WIDTH, EMOTE_DEFAULT_LABEL_HEIGHT);
+    gfx_obj_align(obj, GFX_ALIGN_CENTER, 0, 0);
+    gfx_obj_set_size(obj, handle->h_res, EMOTE_DEF_LABEL_HEIGHT);
     gfx_label_set_text(obj, "");
-    gfx_label_set_color(obj, GFX_COLOR_HEX(EMOTE_DEFAULT_FONT_COLOR));
+    gfx_label_set_color(obj, GFX_COLOR_HEX(EMOTE_DEF_FONT_COLOR));
     gfx_label_set_text_align(obj, GFX_TEXT_ALIGN_CENTER);
     gfx_label_set_long_mode(obj, GFX_LABEL_LONG_SCROLL);
-    gfx_label_set_scroll_speed(obj, EMOTE_DEFAULT_SCROLL_SPEED);
+    gfx_label_set_scroll_speed(obj, EMOTE_DEF_SCROLL_SPEED);
     gfx_label_set_scroll_loop(obj, true);
     // Use default font size 26
-    gfx_label_set_font(obj, (void *)&font_maison_neue_book_26);
+    gfx_label_set_font(obj, (void *)&font_puhui_basic_20_4);
     gfx_obj_set_visible(obj, true);
 }
 
-static void emote_config_label_toast_obj(gfx_obj_t *obj)
+static void emote_config_label_toast_obj(gfx_obj_t *obj, emote_handle_t handle)
 {
+    (void)handle;
     if (!obj) {
         return;
     }
 
-    gfx_obj_align(obj, GFX_ALIGN_TOP_MID, 0, EMOTE_DEFAULT_LABEL_Y_OFFSET);
-    gfx_obj_set_size(obj, EMOTE_DEFAULT_LABEL_WIDTH, EMOTE_DEFAULT_LABEL_HEIGHT);
+    gfx_obj_align(obj, GFX_ALIGN_TOP_MID, 0, EMOTE_DEF_LABEL_Y_OFFSET);
+    gfx_obj_set_size(obj, EMOTE_DEF_LABEL_WIDTH, EMOTE_DEF_LABEL_HEIGHT);
     gfx_label_set_text(obj, "");
-    gfx_label_set_color(obj, GFX_COLOR_HEX(0xFFFFFF));
+    gfx_label_set_color(obj, GFX_COLOR_HEX(EMOTE_DEF_FONT_COLOR));
     gfx_label_set_text_align(obj, GFX_TEXT_ALIGN_CENTER);
     gfx_label_set_long_mode(obj, GFX_LABEL_LONG_SCROLL);
-    gfx_label_set_scroll_speed(obj, EMOTE_DEFAULT_SCROLL_SPEED);
+    gfx_label_set_scroll_speed(obj, EMOTE_DEF_SCROLL_SPEED);
+    gfx_label_set_scroll_loop(obj, true);
+    gfx_label_set_font(obj, (void *)&font_puhui_basic_20_4);
+    gfx_obj_set_visible(obj, true);
+}
+
+static void emote_config_label_clock_obj(gfx_obj_t *obj, emote_handle_t handle)
+{
+    (void)handle;
+    if (!obj) {
+        return;
+    }
+
+    gfx_obj_align(obj, GFX_ALIGN_TOP_MID, 0, EMOTE_DEF_LABEL_Y_OFFSET);
+    gfx_obj_set_size(obj, EMOTE_DEF_LABEL_WIDTH, EMOTE_DEF_LABEL_HEIGHT);
+    gfx_label_set_text(obj, "");
+    gfx_label_set_color(obj, GFX_COLOR_HEX(EMOTE_DEF_FONT_COLOR));
+    gfx_label_set_text_align(obj, GFX_TEXT_ALIGN_CENTER);
+    gfx_label_set_long_mode(obj, GFX_LABEL_LONG_SCROLL);
+    gfx_label_set_scroll_speed(obj, EMOTE_DEF_SCROLL_SPEED);
     gfx_label_set_scroll_loop(obj, true);
     gfx_label_set_font(obj, (void *)&font_maison_neue_book_26);
     gfx_obj_set_visible(obj, true);
 }
 
-static void emote_config_label_clock_obj(gfx_obj_t *obj)
+static void emote_config_label_battery_obj(gfx_obj_t *obj, emote_handle_t handle)
 {
+    (void)handle;
     if (!obj) {
         return;
     }
 
-    gfx_obj_align(obj, GFX_ALIGN_TOP_MID, 0, EMOTE_DEFAULT_LABEL_Y_OFFSET);
-    gfx_obj_set_size(obj, EMOTE_DEFAULT_LABEL_WIDTH, EMOTE_DEFAULT_LABEL_HEIGHT);
+    gfx_obj_align(obj, GFX_ALIGN_TOP_MID, 0, EMOTE_DEF_LABEL_Y_OFFSET);
+    gfx_obj_set_size(obj, EMOTE_DEF_LABEL_WIDTH, EMOTE_DEF_LABEL_HEIGHT);
     gfx_label_set_text(obj, "");
-    gfx_label_set_color(obj, GFX_COLOR_HEX(0xFFFFFF));
+    gfx_label_set_color(obj, GFX_COLOR_HEX(EMOTE_DEF_FONT_COLOR));
     gfx_label_set_text_align(obj, GFX_TEXT_ALIGN_CENTER);
     gfx_label_set_long_mode(obj, GFX_LABEL_LONG_SCROLL);
-    gfx_label_set_scroll_speed(obj, EMOTE_DEFAULT_SCROLL_SPEED);
-    gfx_label_set_scroll_loop(obj, true);
-    gfx_label_set_font(obj, (void *)&font_maison_neue_book_26);
-    gfx_obj_set_visible(obj, true);
-}
-
-static void emote_config_label_battery_obj(gfx_obj_t *obj)
-{
-    if (!obj) {
-        return;
-    }
-
-    gfx_obj_align(obj, GFX_ALIGN_TOP_MID, 0, EMOTE_DEFAULT_LABEL_Y_OFFSET);
-    gfx_obj_set_size(obj, EMOTE_DEFAULT_LABEL_WIDTH, EMOTE_DEFAULT_LABEL_HEIGHT);
-    gfx_label_set_text(obj, "");
-    gfx_label_set_color(obj, GFX_COLOR_HEX(0xFFFFFF));
-    gfx_label_set_text_align(obj, GFX_TEXT_ALIGN_CENTER);
-    gfx_label_set_long_mode(obj, GFX_LABEL_LONG_SCROLL);
-    gfx_label_set_scroll_speed(obj, EMOTE_DEFAULT_SCROLL_SPEED);
+    gfx_label_set_scroll_speed(obj, EMOTE_DEF_SCROLL_SPEED);
     gfx_label_set_scroll_loop(obj, true);
     gfx_label_set_font(obj, (void *)&font_maison_neue_book_12);
     gfx_obj_set_visible(obj, true);
 }
 
-// Object creation lookup table
-static const obj_creation_entry_t obj_creation_table[] = {
-    { EMOTE_OBJ_ANIM_BOOT,      emote_create_anim_obj,  emote_config_anim_obj          },
-    { EMOTE_OBJ_ANIM_EYE,       emote_create_anim_obj,  emote_config_anim_obj          },
-    { EMOTE_OBJ_ANIM_LISTEN,    emote_create_anim_obj,  emote_config_anim_obj          },
-    { EMOTE_OBJ_ANIM_EMERG_DLG, emote_create_anim_obj,  emote_config_anim_obj          },
-    { EMOTE_OBJ_ICON_STATUS,    emote_create_img_obj,   emote_config_img_obj           },
-    { EMOTE_OBJ_ICON_CHARGE,    emote_create_img_obj,   emote_config_img_obj           },
-    { EMOTE_OBJ_LABEL_TOAST,    emote_create_label_obj, emote_config_label_toast_obj   },
-    { EMOTE_OBJ_LABEL_CLOCK,    emote_create_label_obj, emote_config_label_clock_obj  },
-    { EMOTE_OBJ_LABEL_BATTERY,  emote_create_label_obj, emote_config_label_battery_obj },
-    { EMOTE_OBJ_QRCODE,         emote_create_qrcode_obj, emote_config_qrcode_obj       },
-    { EMOTE_OBJ_TIMER_STATUS,   emote_create_timer_obj, NULL                           },
-};
-
-#define OBJ_CREATION_TABLE_SIZE (sizeof(obj_creation_table) / sizeof(obj_creation_table[0]))
-
+// Object management
 static gfx_obj_t *emote_create_object(emote_handle_t handle, emote_obj_type_t type)
 {
     if (!handle) {
         return NULL;
     }
 
-    gfx_obj_t *existing = handle->gfx_objects[type];
+    gfx_obj_t *existing = handle->def_objects[type].obj;
     if (existing) {
         return existing;
     }
@@ -388,20 +405,19 @@ static gfx_obj_t *emote_create_object(emote_handle_t handle, emote_obj_type_t ty
     if (entry && entry->creator) {
         obj = entry->creator(gfx_handle, handle);
         if (obj && entry->configurator) {
-            entry->configurator(obj);
+            entry->configurator(obj, handle);
         }
     }
 
     gfx_emote_unlock(gfx_handle);
 
     if (obj) {
-        handle->gfx_objects[type] = obj;
+        handle->def_objects[type].obj = obj;
     }
 
     return obj;
 }
 
-// Find custom object by name
 static emote_custom_obj_entry_t *emote_find_custom_obj(emote_handle_t handle, const char *name)
 {
     if (!handle || !name) {
@@ -418,49 +434,49 @@ static emote_custom_obj_entry_t *emote_find_custom_obj(emote_handle_t handle, co
     return NULL;
 }
 
-// Register custom object
-static bool emote_register_custom_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj)
+static esp_err_t emote_register_custom_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj)
 {
-    if (!handle || !name || !obj) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+    emote_custom_obj_entry_t *entry = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && obj, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     // Check if already exists
     if (emote_find_custom_obj(handle, name)) {
         ESP_LOGW(TAG, "Custom object '%s' already exists", name);
-        return false;
+        ret = ESP_ERR_INVALID_STATE;
+        goto error;
     }
 
     // Create new entry
-    emote_custom_obj_entry_t *entry = (emote_custom_obj_entry_t *)calloc(1, sizeof(emote_custom_obj_entry_t));
-    if (!entry) {
-        ESP_LOGE(TAG, "Failed to allocate custom object entry");
-        return false;
-    }
+    entry = (emote_custom_obj_entry_t *)calloc(1, sizeof(emote_custom_obj_entry_t));
+    ESP_GOTO_ON_FALSE(entry, ESP_ERR_NO_MEM, error, TAG, "Failed to allocate custom object entry");
 
     entry->name = strdup(name);
-    if (!entry->name) {
-        ESP_LOGE(TAG, "Failed to duplicate name string");
-        free(entry);
-        return false;
-    }
+    ESP_GOTO_ON_FALSE(entry->name, ESP_ERR_NO_MEM, error, TAG, "Failed to duplicate name string");
 
     entry->obj = obj;
     entry->next = handle->custom_objects;
     handle->custom_objects = entry;
 
     ESP_LOGD(TAG, "Registered custom object: %s", name);
-    return true;
+    return ESP_OK;
+
+error:
+    if (entry) {
+        free(entry);
+    }
+    return ret;
 }
 
-static gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *name)
+gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *name)
 {
     ESP_LOGD(TAG, "create object by name: %s", name);
 
     // First check predefined types
     emote_obj_type_t type = emote_get_element_type(name);
-    if (type != EMOTE_OBJ_MAX) {
-        gfx_obj_t *obj = handle->gfx_objects[type];
+    if (type != EMOTE_DEF_OBJ_MAX) {
+        gfx_obj_t *obj = handle->def_objects[type].obj;
         if (!obj) {
             obj = emote_create_object(handle, type);
         }
@@ -477,27 +493,28 @@ static gfx_obj_t *emote_create_obj_by_name(emote_handle_t handle, const char *na
     return NULL;
 }
 
-bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *layout)
+// ===== Public Function Implementations =====
+
+esp_err_t emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *layout)
 {
-    if (!handle || !name || !layout) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && layout, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     cJSON *align = cJSON_GetObjectItem(layout, "align");
     cJSON *x = cJSON_GetObjectItem(layout, "x");
     cJSON *y = cJSON_GetObjectItem(layout, "y");
 
-    if (!cJSON_IsString(align) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
-        ESP_LOGE(TAG, "Anim %s: missing align/x/y fields", name);
-        return false;
-    }
+    ESP_GOTO_ON_FALSE(cJSON_IsString(align) && cJSON_IsNumber(x) && cJSON_IsNumber(y),
+                      ESP_ERR_INVALID_ARG, error, TAG, "Anim %s: missing align/x/y fields", name);
 
     const char *align_str = align->valuestring;
     int xVal = x->valueint;
     int yVal = y->valueint;
 
     bool autoMirror = false;
-    cJSON *animObj = cJSON_GetObjectItem(layout, "anim");
+    cJSON *animObj = cJSON_GetObjectItem(layout, EMOTE_OBJ_TYPE_ANIM);
     if (cJSON_IsObject(animObj)) {
         cJSON *mirror = cJSON_GetObjectItem(animObj, "mirror");
         if (cJSON_IsString(mirror)) {
@@ -506,11 +523,8 @@ bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *lay
         }
     }
 
-    gfx_obj_t *obj = emote_create_obj_by_name(handle, name);
-    if (!obj) {
-        ESP_LOGE(TAG, "Failed to create anim: %s", name);
-        return false;
-    }
+    obj = emote_create_obj_by_name(handle, name);
+    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Failed to create anim: %s", name);
 
     gfx_emote_lock(handle->gfx_emote_handle);
     gfx_obj_align(obj, emote_convert_align_str(align_str), xVal, yVal);
@@ -520,68 +534,67 @@ bool emote_apply_anim_layout(emote_handle_t handle, const char *name, cJSON *lay
     gfx_obj_set_visible(obj, false);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
-    return true;
+    return ESP_OK;
+
+error:
+    return ret;
 }
 
-bool emote_apply_image_layout(emote_handle_t handle, const char *name, cJSON *layout)
+esp_err_t emote_apply_image_layout(emote_handle_t handle, const char *name, cJSON *layout)
 {
-    if (!handle || !name || !layout) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && layout, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     cJSON *align = cJSON_GetObjectItem(layout, "align");
     cJSON *x = cJSON_GetObjectItem(layout, "x");
     cJSON *y = cJSON_GetObjectItem(layout, "y");
 
-    if (!cJSON_IsString(align) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
-        ESP_LOGE(TAG, "Image %s: missing align/x/y fields", name);
-        return false;
-    }
+    ESP_GOTO_ON_FALSE(cJSON_IsString(align) && cJSON_IsNumber(x) && cJSON_IsNumber(y),
+                      ESP_ERR_INVALID_ARG, error, TAG, "Image %s: missing align/x/y fields", name);
 
-    gfx_obj_t *obj = emote_create_obj_by_name(handle, name);
-    if (!obj) {
-        ESP_LOGE(TAG, "Failed to create image: %s", name);
-        return false;
-    }
+    obj = emote_create_obj_by_name(handle, name);
+    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Failed to create image: %s", name);
 
     gfx_emote_lock(handle->gfx_emote_handle);
     gfx_obj_align(obj, emote_convert_align_str(align->valuestring), x->valueint, y->valueint);
     gfx_obj_set_visible(obj, false);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
-    return true;
+    return ESP_OK;
+
+error:
+    return ret;
 }
 
-bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *layout)
+esp_err_t emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *layout)
 {
-    if (!handle || !name || !layout) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && layout, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     cJSON *align = cJSON_GetObjectItem(layout, "align");
     cJSON *x = cJSON_GetObjectItem(layout, "x");
     cJSON *y = cJSON_GetObjectItem(layout, "y");
 
-    if (!cJSON_IsString(align) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
-        ESP_LOGE(TAG, "Label %s: missing align/x/y fields", name);
-        return false;
-    }
+    ESP_GOTO_ON_FALSE(cJSON_IsString(align) && cJSON_IsNumber(x) && cJSON_IsNumber(y),
+                      ESP_ERR_INVALID_ARG, error, TAG, "Label %s: missing align/x/y fields", name);
 
     cJSON *width = cJSON_GetObjectItem(layout, "width");
     cJSON *height = cJSON_GetObjectItem(layout, "height");
     int w = cJSON_IsNumber(width) ? width->valueint : 0;
     int h = cJSON_IsNumber(height) ? height->valueint : 0;
 
-    uint32_t color = EMOTE_DEFAULT_FONT_COLOR;
+    uint32_t color = EMOTE_DEF_FONT_COLOR;
     const char *textAlign = "center";
     const char *longModeType = "clip";
     bool longModeLoop = false;
-    int longModeSpeed = EMOTE_DEFAULT_SCROLL_SPEED;
+    int longModeSpeed = EMOTE_DEF_SCROLL_SPEED;
     int longModeSnapInterval = 1500;
 
-
-
-    cJSON *labelObj = cJSON_GetObjectItem(layout, "label");
+    cJSON *labelObj = cJSON_GetObjectItem(layout, EMOTE_OBJ_TYPE_LABEL);
     if (cJSON_IsObject(labelObj)) {
         cJSON *colorJson = cJSON_GetObjectItem(labelObj, "color");
         if (cJSON_IsNumber(colorJson)) {
@@ -617,11 +630,8 @@ bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *la
         }
     }
 
-    gfx_obj_t *obj = emote_create_obj_by_name(handle, name);
-    if (!obj) {
-        ESP_LOGE(TAG, "Failed to create label: %s", name);
-        return false;
-    }
+    obj = emote_create_obj_by_name(handle, name);
+    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Failed to create label: %s", name);
 
     gfx_emote_lock(handle->gfx_emote_handle);
     gfx_obj_align(obj, emote_convert_align_str(align->valuestring), x->valueint, y->valueint);
@@ -645,23 +655,24 @@ bool emote_apply_label_layout(emote_handle_t handle, const char *name, cJSON *la
     gfx_obj_set_visible(obj, false);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
-    return true;
+    return ESP_OK;
+
+error:
+    return ret;
 }
 
-bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *layout)
+esp_err_t emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *layout)
 {
-    if (!handle || !name || !layout) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && layout, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     uint32_t period = 1000;
     int32_t repeat_count = -1;
 
-    cJSON *timerObj = cJSON_GetObjectItem(layout, "timer");
-    if (!cJSON_IsObject(timerObj)) {
-        ESP_LOGE(TAG, "Timer object not found for %s", name);
-        return false;
-    }
+    cJSON *timerObj = cJSON_GetObjectItem(layout, EMOTE_OBJ_TYPE_TIMER);
+    ESP_GOTO_ON_FALSE(cJSON_IsObject(timerObj), ESP_ERR_INVALID_ARG, error, TAG, "Timer object not found for %s", name);
 
     cJSON *periodJson = cJSON_GetObjectItem(timerObj, "period");
     if (cJSON_IsNumber(periodJson)) {
@@ -673,11 +684,8 @@ bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *la
         repeat_count = repeatCountJson->valueint;
     }
 
-    gfx_obj_t *obj = emote_create_obj_by_name(handle, name);
-    if (!obj) {
-        ESP_LOGE(TAG, "Failed to create timer: %s", name);
-        return false;
-    }
+    obj = emote_create_obj_by_name(handle, name);
+    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Failed to create timer: %s", name);
 
     gfx_emote_lock(handle->gfx_emote_handle);
     gfx_timer_set_repeat_count(obj, repeat_count);
@@ -685,26 +693,28 @@ bool emote_apply_timer_layout(emote_handle_t handle, const char *name, cJSON *la
     gfx_timer_pause((gfx_timer_handle_t)obj);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
-    return true;
+    return ESP_OK;
+
+error:
+    return ret;
 }
 
-bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *layout)
+esp_err_t emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *layout)
 {
-    if (!handle || !name || !layout) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && layout, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     cJSON *align = cJSON_GetObjectItem(layout, "align");
     cJSON *x = cJSON_GetObjectItem(layout, "x");
     cJSON *y = cJSON_GetObjectItem(layout, "y");
 
-    if (!cJSON_IsString(align) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
-        ESP_LOGE(TAG, "QRCode %s: missing align/x/y fields", name);
-        return false;
-    }
+    ESP_GOTO_ON_FALSE(cJSON_IsString(align) && cJSON_IsNumber(x) && cJSON_IsNumber(y),
+                      ESP_ERR_INVALID_ARG, error, TAG, "QRCode %s: missing align/x/y fields", name);
 
     int size = 150;  // Default QRCode size
-    cJSON *qrcodeObj = cJSON_GetObjectItem(layout, "qrcode");
+    cJSON *qrcodeObj = cJSON_GetObjectItem(layout, EMOTE_OBJ_TYPE_QRCODE);
     if (cJSON_IsObject(qrcodeObj)) {
         cJSON *sizeJson = cJSON_GetObjectItem(qrcodeObj, "size");
         if (cJSON_IsNumber(sizeJson)) {
@@ -712,11 +722,8 @@ bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *l
         }
     }
 
-    gfx_obj_t *obj = emote_create_obj_by_name(handle, name);
-    if (!obj) {
-        ESP_LOGE(TAG, "Failed to create qrcode: %s", name);
-        return false;
-    }
+    obj = emote_create_obj_by_name(handle, name);
+    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Failed to create qrcode: %s", name);
 
     gfx_emote_lock(handle->gfx_emote_handle);
     gfx_obj_align(obj, emote_convert_align_str(align->valuestring), x->valueint, y->valueint);
@@ -726,76 +733,34 @@ bool emote_apply_qrcode_layout(emote_handle_t handle, const char *name, cJSON *l
     gfx_obj_set_visible(obj, false);
     gfx_emote_unlock(handle->gfx_emote_handle);
 
-    return true;
+    return ESP_OK;
+
+error:
+    return ret;
 }
 
-bool emote_apply_fonts(emote_handle_t handle, const uint8_t *fontData)
+esp_err_t emote_apply_fonts(emote_handle_t handle, const uint8_t *fontData)
 {
-    if (!handle || !fontData) {
-        return false;
-    }
+    esp_err_t ret = ESP_OK;
+
+    ESP_GOTO_ON_FALSE(handle && fontData, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     handle->gfx_font = gfx_font_lv_load_from_binary((uint8_t *)fontData);
-    if (!handle->gfx_font) {
-        ESP_LOGE(TAG, "Failed to create font");
-        return false;
-    }
+    ESP_GOTO_ON_FALSE(handle->gfx_font, ESP_ERR_INVALID_STATE, error, TAG, "Failed to create font");
 
-    gfx_obj_t *obj = handle->gfx_objects[EMOTE_OBJ_LABEL_TOAST];
+    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
         gfx_emote_lock(handle->gfx_emote_handle);
         gfx_label_set_font(obj, handle->gfx_font);
         gfx_emote_unlock(handle->gfx_emote_handle);
     }
 
-    return true;
+    return ESP_OK;
+
+error:
+    return ret;
 }
 
-void emote_delete_boot_anim(emote_handle_t handle)
-{
-    if (!handle) {
-        return;
-    }
-
-    // Delete boot animation if exists
-    gfx_obj_t *boot_obj = handle->gfx_objects[EMOTE_OBJ_ANIM_BOOT];
-    if (boot_obj) {
-        gfx_emote_lock(handle->gfx_emote_handle);
-        gfx_obj_delete(boot_obj);
-        handle->gfx_objects[EMOTE_OBJ_ANIM_BOOT] = NULL;
-        gfx_emote_unlock(handle->gfx_emote_handle);
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(500));
-    emote_set_event_msg(handle, EMOTE_MGR_EVT_SYS, "启动中...");
-}
-
-bool emote_setup_boot_anim(emote_handle_t handle, uint8_t *anim_data, size_t anim_size)
-{
-    if (!handle || !anim_data || (0 == anim_size)) {
-        return false;
-    }
-
-    gfx_obj_t *obj = emote_create_obj_by_name(handle, EMOTE_ELEMENT_BOOT_ANIM);
-    if (!obj) {
-        ESP_LOGE(TAG, "Failed to create boot animation object");
-        return false;
-    }
-
-    gfx_emote_lock(handle->gfx_emote_handle);
-    gfx_emote_set_bg_color(handle->gfx_emote_handle, GFX_COLOR_HEX(0x000000));
-    gfx_obj_set_visible(obj, true);
-    gfx_obj_align(obj, GFX_ALIGN_CENTER, 0, 0);
-    gfx_anim_set_src(obj, anim_data, anim_size);
-    gfx_anim_set_segment(obj, 0, 0xFFFF, EMOTE_DEFAULT_ANIMATION_FPS, false);
-    gfx_anim_start(obj);
-    gfx_emote_unlock(handle->gfx_emote_handle);
-
-    handle->boot_anim_completed = false;
-    return true;
-}
-
-// ===== Public API for Generic Object Management =====
 
 gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name)
 {
@@ -805,8 +770,8 @@ gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name)
 
     // First check predefined types
     emote_obj_type_t type = emote_get_element_type(name);
-    if (type != EMOTE_OBJ_MAX) {
-        return handle->gfx_objects[type];
+    if (type != EMOTE_DEF_OBJ_MAX) {
+        return handle->def_objects[type].obj;
     }
 
     // Check custom objects
@@ -818,12 +783,14 @@ gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name)
     return NULL;
 }
 
-gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, const char *type_str)
+gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *type_str, const char *name)
 {
-    if (!handle || !name || !type_str) {
-        ESP_LOGE(TAG, "Invalid parameters for emote_create_obj_by_type");
-        return NULL;
-    }
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+    gfx_handle_t gfx_handle = NULL;
+    const obj_type_str_entry_t *entry = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name && type_str, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     // Check if object already exists
     gfx_obj_t *existing = emote_get_obj_by_name(handle, name);
@@ -833,7 +800,6 @@ gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, con
     }
 
     // Find type string in mapping table
-    const obj_type_str_entry_t *entry = NULL;
     for (size_t i = 0; i < OBJ_TYPE_STR_TABLE_SIZE; i++) {
         if (strcmp(obj_type_str_table[i].type_str, type_str) == 0) {
             entry = &obj_type_str_table[i];
@@ -841,55 +807,37 @@ gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *name, con
         }
     }
 
-    if (!entry || !entry->creator) {
-        ESP_LOGE(TAG, "Unknown object type: %s", type_str);
-        return NULL;
-    }
+    ESP_GOTO_ON_FALSE(entry && entry->creator, ESP_ERR_INVALID_ARG, error, TAG, "Unknown object type: %s", type_str);
 
-    gfx_handle_t gfx_handle = handle->gfx_emote_handle;
-    if (!gfx_handle) {
-        ESP_LOGE(TAG, "GFX handle not initialized");
-        return NULL;
-    }
+    gfx_handle = handle->gfx_emote_handle;
+    ESP_GOTO_ON_FALSE(gfx_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
 
     gfx_emote_lock(gfx_handle);
 
     // Create object
-    gfx_obj_t *obj = entry->creator(gfx_handle, handle);
+    obj = entry->creator(gfx_handle, handle);
     if (obj && entry->configurator) {
-        entry->configurator(obj);
+        entry->configurator(obj, handle);
     }
 
     gfx_emote_unlock(gfx_handle);
 
     if (obj) {
         // Register as custom object
-        if (!emote_register_custom_obj(handle, name, obj)) {
+        ret = emote_register_custom_obj(handle, name, obj);
+        if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to register custom object: %s", name);
             gfx_emote_lock(gfx_handle);
             gfx_obj_delete(obj);
             gfx_emote_unlock(gfx_handle);
-            return NULL;
+            obj = NULL;
+            goto error;
         }
         ESP_LOGI(TAG, "Created custom object '%s' of type '%s'", name, type_str);
     }
 
     return obj;
-}
 
-bool emote_register_obj(emote_handle_t handle, const char *name, gfx_obj_t *obj)
-{
-    if (!handle || !name || !obj) {
-        ESP_LOGE(TAG, "Invalid parameters for emote_register_obj");
-        return false;
-    }
-
-    // Check if name conflicts with predefined types
-    emote_obj_type_t type = emote_get_element_type(name);
-    if (type != EMOTE_OBJ_MAX) {
-        ESP_LOGE(TAG, "Name '%s' conflicts with predefined element", name);
-        return false;
-    }
-
-    return emote_register_custom_obj(handle, name, obj);
+error:
+    return NULL;
 }
