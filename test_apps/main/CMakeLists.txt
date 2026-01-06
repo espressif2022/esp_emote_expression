@@ -5,8 +5,7 @@ idf_component_register(
 )
 
 set(RESOLUTION "320_240")
-set(ASSETS_NAME "asset_test")
-set(BOOT_ANIM_NAME "anim_360_360")
+set(ASSETS_NAME "esp32_s3_assets.bin")
 
 if (CONFIG_EXAMPLE_EXPRESSIONS_ENABLE_EMOTE)
     set(ASSETS_FILE "${CMAKE_BINARY_DIR}/${ASSETS_NAME}.bin")
@@ -16,6 +15,5 @@ if (CONFIG_EXAMPLE_EXPRESSIONS_ENABLE_EMOTE)
 else()
     message(STATUS "Emote is not enabled, skipping emote assets generation")
 endif()
-
 
 spiffs_create_partition_image(storage ../spiffs FLASH_IN_PROJECT)

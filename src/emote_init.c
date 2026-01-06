@@ -103,7 +103,8 @@ emote_handle_t emote_init(const emote_config_t *config)
             .task_priority = config->task.task_priority,
             .task_stack = config->task.task_stack,
             .task_affinity = config->task.task_affinity,
-            .task_stack_caps = MALLOC_CAP_DEFAULT,
+            .task_stack_caps = config->task.task_stack_in_ext ? \
+                (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : (MALLOC_CAP_INTERNAL | MALLOC_CAP_DEFAULT),
         }
     };
 

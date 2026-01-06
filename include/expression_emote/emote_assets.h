@@ -51,7 +51,7 @@ esp_err_t emote_load_assets(emote_handle_t handle);
  * @param data Source data structure
  * @return ESP_OK on success, error code on failure
  */
-esp_err_t emote_load_and_mount_assets(emote_handle_t handle, const emote_data_t *data);
+esp_err_t emote_mount_and_load_assets(emote_handle_t handle, const emote_data_t *data);
 
 /**
  * @brief Get parsed icon data by name (from parsed icon table)

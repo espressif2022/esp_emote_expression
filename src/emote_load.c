@@ -10,6 +10,8 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_check.h"
+#include "soc/soc_memory_layout.h"
+#include "soc/ext_mem_defs.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -147,10 +149,8 @@ const void *emote_acquire_data(emote_handle_t handle, const void *data_ref, size
 
     mmap_assets_handle_t asset_handle = handle->assets_handle;
 
-    const size_t OFFSET_THRESHOLD = 0x1000000;
-    bool is_executed = ((size_t)data_ref < OFFSET_THRESHOLD);
-
-    if (!is_executed || asset_handle == NULL) {
+    bool is_DBUS = ((size_t)data_ref >= SOC_MMU_DBUS_VADDR_BASE);
+    if (is_DBUS || asset_handle == NULL) {
         if (output_ptr && *output_ptr) {
             free(*output_ptr);
             *output_ptr = NULL;
@@ -210,17 +210,12 @@ error:
 
 static esp_err_t emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht, const char *key, void **result)
 {
-    esp_err_t ret = ESP_OK;
-
-    ESP_GOTO_ON_FALSE(handle && ht && key && result, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    if(!handle || !ht || !key || !result) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
     *result = emote_assets_table_get(ht, key);
-    ESP_GOTO_ON_FALSE(*result, ESP_ERR_NOT_FOUND, error, TAG, "[%s] table not found: %s", ht->name ? ht->name : "unknown", key);
-
-    return ESP_OK;
-
-error:
-    return ret;
+    return *result ? ESP_OK : ESP_ERR_NOT_FOUND;
 }
 
 esp_err_t emote_unmount_assets(emote_handle_t handle)
@@ -566,14 +561,10 @@ esp_err_t emote_get_icon_data_by_name(emote_handle_t handle, const char *name, i
 {
     esp_err_t ret = ESP_OK;
 
-    ESP_GOTO_ON_FALSE(handle && name && icon, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
-
+    if(!handle || !name || !icon) {
+        return ESP_ERR_INVALID_ARG;
+    }
     ret = emote_find_data_by_key(handle, handle->icon_table, name, (void **)icon);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Icon not found: %s", name);
-
-    return ESP_OK;
-
-error:
     return ret;
 }
 
@@ -581,14 +572,10 @@ esp_err_t emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, 
 {
     esp_err_t ret = ESP_OK;
 
-    ESP_GOTO_ON_FALSE(handle && name && emoji, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
-
+    if(!handle || !name || !emoji) {
+        return ESP_ERR_INVALID_ARG;
+    }
     ret = emote_find_data_by_key(handle, handle->emoji_table, name, (void **)emoji);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found: %s", name);
-
-    return ESP_OK;
-
-error:
     return ret;
 }
 
