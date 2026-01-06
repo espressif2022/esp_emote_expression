@@ -74,7 +74,7 @@ static emote_config_t get_default_emote_config(void)
         },
         .task = {
             .task_priority = 5,
-            .task_stack = 4096,
+            .task_stack = 6 * 1024,
             .task_affinity = -1,
             .task_stack_in_ext = false,
         },
@@ -263,6 +263,28 @@ TEST_CASE("Test basic elements", "[partition][flash read][basic]")
     }
 }
 
+TEST_CASE("Test custom elements", "[partition][flash mmap][custom]")
+{
+    emote_handle_t handle = init_emote();
+    if (handle) {
+        emote_data_t data = {
+            .type = EMOTE_SOURCE_PARTITION,
+            .source = {
+                .partition_label = "anim_icon",
+            },
+            .flags = {
+                .mmap_enable = true,
+            },
+        };
+        ESP_LOGI(TAG, "Assets loaded from partition");
+        emote_mount_and_load_assets(handle, &data);
+
+        test_emote_custom(handle);
+
+        cleanup_emote(handle);
+    }
+}
+
 TEST_CASE("Test basic elements", "[path][flash read][basic]")
 {
     bsp_spiffs_mount();
@@ -285,7 +307,7 @@ TEST_CASE("Test basic elements", "[path][flash read][basic]")
         emote_data_t data = {
             .type = EMOTE_SOURCE_PATH,
             .source = {
-                .path = BSP_SPIFFS_MOUNT_POINT "/asset_test.bin",
+                .path = BSP_SPIFFS_MOUNT_POINT "/esp32_s3_assets.bin",
             },
         };
         ESP_LOGI(TAG, "Assets loaded from path:%s", data.source.path);
@@ -297,28 +319,6 @@ TEST_CASE("Test basic elements", "[path][flash read][basic]")
     }
 
     bsp_spiffs_unmount();
-}
-
-TEST_CASE("Test custom elements", "[partition][flash mmap][custom]")
-{
-    emote_handle_t handle = init_emote();
-    if (handle) {
-        emote_data_t data = {
-            .type = EMOTE_SOURCE_PARTITION,
-            .source = {
-                .partition_label = "anim_icon",
-            },
-            .flags = {
-                .mmap_enable = true,
-            },
-        };
-        ESP_LOGI(TAG, "Assets loaded from partition");
-        emote_mount_and_load_assets(handle, &data);
-
-        test_emote_custom(handle);
-
-        cleanup_emote(handle);
-    }
 }
 
 void app_main(void)

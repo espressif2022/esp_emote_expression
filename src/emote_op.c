@@ -161,7 +161,7 @@ static esp_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t ob
     ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     ret = emote_get_icon_data_by_name(handle, name, &icon);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Icon not found: %s", name);
+    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found:\"%s\"", name);
 
     obj = handle->def_objects[obj_type].obj;
     ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "object not found");
@@ -206,7 +206,7 @@ static esp_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_
     ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     ret = emote_get_icon_data_by_name(handle, name, &icon);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Icon not found: %s", name);
+    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found:\"%s\"", name);
 
     obj = handle->def_objects[obj_type].obj;
     ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Object not found");
@@ -268,7 +268,7 @@ static esp_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type
     ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     ret = emote_get_emoji_data_by_name(handle, name, &emoji);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Emoji not found: %s", name);
+    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found:\"%s\"", name);
 
     ESP_LOGD(TAG, "Setting emoji: %s (fps=%d, loop=%s)",
              name, emoji->fps, emoji->loop ? "true" : "false");
@@ -328,9 +328,6 @@ static esp_err_t emote_handle_listen_event(emote_handle_t handle, const char *me
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_MIC, true);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set microphone icon");
-    }
 
     return ret;
 }
@@ -345,9 +342,6 @@ static esp_err_t emote_handle_speak_event(emote_handle_t handle, const char *mes
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_SPEAKER, true);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set speaker icon");
-    }
 
     gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
@@ -356,7 +350,7 @@ static esp_err_t emote_handle_speak_event(emote_handle_t handle, const char *mes
         gfx_emote_unlock(handle->gfx_emote_handle);
     }
 
-    return ESP_OK;
+    return ret;
 }
 
 static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *message)
@@ -369,9 +363,6 @@ static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *m
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_TIPS, true);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set tips icon");
-    }
 
     gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
@@ -380,7 +371,7 @@ static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *m
         gfx_emote_unlock(handle->gfx_emote_handle);
     }
 
-    return ESP_OK;
+    return ret;
 }
 
 static esp_err_t emote_handle_qrcode_set_event(emote_handle_t handle, const char *message)
@@ -394,9 +385,6 @@ static esp_err_t emote_handle_qrcode_set_event(emote_handle_t handle, const char
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_TIPS, true);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set tips icon");
-    }
 
     HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
@@ -406,7 +394,7 @@ static esp_err_t emote_handle_qrcode_set_event(emote_handle_t handle, const char
         gfx_emote_unlock(handle->gfx_emote_handle);
     }
 
-    return ESP_OK;
+    return ret;
 }
 
 static esp_err_t emote_handle_bat_event(emote_handle_t handle, const char *message)
@@ -509,34 +497,22 @@ error:
 
 esp_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name)
 {
-    esp_err_t ret = ESP_OK;
-
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    if(!handle || !name) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
     emote_set_eye_hidden(handle, false);
-    ret = emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EYE, name);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Failed to set emoji animation");
-
-    return ESP_OK;
-
-error:
-    return ret;
+    return emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EYE, name);
 }
 
 esp_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name)
 {
-    esp_err_t ret = ESP_OK;
-
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    if(!handle || !name) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
     emote_set_eye_hidden(handle, true);
-    ret = emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EMERG_DLG, name);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Failed to set dialog animation");
-
-    return ESP_OK;
-
-error:
-    return ret;
+    return emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EMERG_DLG, name);
 }
 
 esp_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text)
