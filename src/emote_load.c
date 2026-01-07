@@ -148,8 +148,13 @@ const void *emote_acquire_data(emote_handle_t handle, const void *data_ref, size
     }
 
     mmap_assets_handle_t asset_handle = handle->assets_handle;
-
-    bool is_DBUS = ((size_t)data_ref >= SOC_MMU_DBUS_VADDR_BASE);
+    bool is_DBUS = false;
+#if CONFIG_IDF_TARGET_ESP32P4
+    is_DBUS = ((size_t)data_ref >= SOC_MMU_FLASH_VADDR_BASE);
+#else
+    is_DBUS = ((size_t)data_ref >= SOC_MMU_DBUS_VADDR_BASE);
+#endif
+    ESP_LOGI(TAG, "is_DBUS: %d, data_ref: %p", is_DBUS, data_ref);
     if (is_DBUS || asset_handle == NULL) {
         if (output_ptr && *output_ptr) {
             free(*output_ptr);
@@ -210,7 +215,7 @@ error:
 
 static esp_err_t emote_find_data_by_key(emote_handle_t handle, assets_hash_table_t *ht, const char *key, void **result)
 {
-    if(!handle || !ht || !key || !result) {
+    if (!handle || !ht || !key || !result) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -561,7 +566,7 @@ esp_err_t emote_get_icon_data_by_name(emote_handle_t handle, const char *name, i
 {
     esp_err_t ret = ESP_OK;
 
-    if(!handle || !name || !icon) {
+    if (!handle || !name || !icon) {
         return ESP_ERR_INVALID_ARG;
     }
     ret = emote_find_data_by_key(handle, handle->icon_table, name, (void **)icon);
@@ -572,7 +577,7 @@ esp_err_t emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, 
 {
     esp_err_t ret = ESP_OK;
 
-    if(!handle || !name || !emoji) {
+    if (!handle || !name || !emoji) {
         return ESP_ERR_INVALID_ARG;
     }
     ret = emote_find_data_by_key(handle, handle->emoji_table, name, (void **)emoji);
