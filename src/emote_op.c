@@ -497,7 +497,7 @@ error:
 
 esp_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name)
 {
-    if(!handle || !name) {
+    if (!handle || !name) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -507,7 +507,7 @@ esp_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name)
 
 esp_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name)
 {
-    if(!handle || !name) {
+    if (!handle || !name) {
         return ESP_ERR_INVALID_ARG;
     }
 
