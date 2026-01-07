@@ -154,7 +154,6 @@ const void *emote_acquire_data(emote_handle_t handle, const void *data_ref, size
 #else
     is_DBUS = ((size_t)data_ref >= SOC_MMU_DBUS_VADDR_BASE);
 #endif
-    ESP_LOGI(TAG, "is_DBUS: %d, data_ref: %p", is_DBUS, data_ref);
     if (is_DBUS || asset_handle == NULL) {
         if (output_ptr && *output_ptr) {
             free(*output_ptr);

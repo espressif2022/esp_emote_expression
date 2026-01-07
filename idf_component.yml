@@ -1,4 +1,4 @@
-version: "0.1.0~2"
+version: "0.1.0~3"
 license: "Apache-2.0"
 description: ESP-Brookesia-Expression-Emote is a component for managing expression emotes in ESP-Brookesia.
 url: "https://github.com/espressif2022/esp_emote_expression"
