@@ -1,6 +1,6 @@
 # ESP-Emote-Expression
 
-ESP-Emote-Expression is an ESP-IDF component for managing emote animations and UI display, designed specifically for the ESP-Brookesia project. This component provides rich emote animation management, UI element control, and event handling capabilities.
+ESP-Emote-Expression is an ESP-IDF component for managing emote animations and UI display.This component provides rich emote animation management, UI element control, and event handling capabilities.
 
 ## Features
 
@@ -160,10 +160,11 @@ emote_set_event_msg(handle, EMOTE_MGR_EVT_BAT, "1,100");  // Charging, 100%
 
 ### Resource Loading
 
+- `emote_mount_and_load_assets()` - Mount and parse assets in one call
 - `emote_mount_assets()` - Mount assets from source (partition or file path)
 - `emote_unmount_assets()` - Unmount assets
 - `emote_load_assets()` - Parse JSON and load emojis, icons, layouts, fonts
-- `emote_mount_and_load_assets()` - Mount and parse assets in one call
+- `emote_unload_assets()` - Unload assets data (assets loaded by emote_load_assets)
 - `emote_get_icon_data_by_name()` - Get parsed icon data by name
 - `emote_get_emoji_data_by_name()` - Get parsed emoji data by name
 - `emote_get_asset_data_by_name()` - Get raw asset file data by name
@@ -171,6 +172,7 @@ emote_set_event_msg(handle, EMOTE_MGR_EVT_BAT, "1,100");  // Charging, 100%
 ### Animation Control
 
 - `emote_set_anim_emoji()` - Set emoji animation on eye object
+- `emote_set_anim_visible()` - Set face visible or not
 - `emote_set_dialog_anim()` - Set emergency dialog animation
 - `emote_insert_anim_dialog()` - Insert emergency dialog animation with auto-stop timer
 - `emote_stop_anim_dialog()` - Stop emergency dialog animation
@@ -185,6 +187,7 @@ emote_set_event_msg(handle, EMOTE_MGR_EVT_BAT, "1,100");  // Charging, 100%
 
 - `emote_get_obj_by_name()` - Get graphics object by name
 - `emote_create_obj_by_type()` - Create custom object by type (anim, image, label, qrcode, timer)
+- `emote_set_obj_visible()` - Set object visible or not
 - `emote_lock()` - Lock the emote manager (for thread-safe operations)
 - `emote_unlock()` - Unlock the emote manager
 
@@ -204,7 +207,7 @@ The component supports the following event types:
 - `EMOTE_MGR_EVT_SYS` - System event
 - `EMOTE_MGR_EVT_SET` - Settings event
 - `EMOTE_MGR_EVT_BAT` - Battery event
-- `EMOTE_MGR_EVT_QRCODE` - QR code event
+- `EMOTE_MGR_EVT_OFF` - Close title event
 
 ## Configuration
 

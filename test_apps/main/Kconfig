@@ -1,5 +1,0 @@
-menu "Expressions"
-    config EXAMPLE_EXPRESSIONS_ENABLE_EMOTE
-        bool "Enable Emote expression"
-        default y
-endmenu

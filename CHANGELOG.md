@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-02-13
+
+- Add unload interface
+- Add visibale API
+- Add build action for P4
+- Adapt to emote_gfx 3.0.0+ API
+
 ## [0.1.0] - 2026-01-05
 
 ### Added

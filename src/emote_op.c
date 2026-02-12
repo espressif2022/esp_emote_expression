@@ -61,8 +61,8 @@ static esp_err_t emote_handle_idle_event(emote_handle_t handle, const char *mess
 static esp_err_t emote_handle_listen_event(emote_handle_t handle, const char *message);
 static esp_err_t emote_handle_speak_event(emote_handle_t handle, const char *message);
 static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *message);
+static esp_err_t emote_handle_off_event(emote_handle_t handle, const char *message);
 static esp_err_t emote_handle_bat_event(emote_handle_t handle, const char *message);
-static esp_err_t emote_handle_qrcode_set_event(emote_handle_t handle, const char *message);
 
 // Timer callback
 static void emote_dialog_timer_cb(void *data);
@@ -74,8 +74,8 @@ static const emote_event_entry_t event_table[] = {
     { EMOTE_MGR_EVT_SPEAK,  emote_handle_speak_event,   false },
     { EMOTE_MGR_EVT_SYS,    emote_handle_sys_set_event, false },
     { EMOTE_MGR_EVT_SET,    emote_handle_sys_set_event, false },
-    { EMOTE_MGR_EVT_QRCODE, emote_handle_qrcode_set_event, false },
     { EMOTE_MGR_EVT_BAT,    emote_handle_bat_event,     true  },
+    { EMOTE_MGR_EVT_OFF,    emote_handle_off_event,     false  },
 };
 
 // ===== Static Function Implementations =====
@@ -139,13 +139,13 @@ static void emote_set_eye_hidden(emote_handle_t handle, bool hidden)
         return;
     }
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     if (hidden) {
         HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     } else {
         SHOW_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     }
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 }
 
 // UI helper functions
@@ -174,7 +174,7 @@ static esp_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t ob
     img_dsc = emote_get_img_dsc_by_obj_type(handle, obj_type);
     ESP_GOTO_ON_FALSE(img_dsc, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get image descriptor for object type %d", obj_type);
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     src_data = emote_acquire_data(handle, icon->data, icon->size, cache_ptr);
     ESP_GOTO_ON_FALSE(src_data, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire icon data");
 
@@ -184,11 +184,11 @@ static esp_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t ob
 
     gfx_img_set_src(obj, img_dsc);
     gfx_obj_set_visible(obj, visible);
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 
 error:
     return ret;
@@ -214,7 +214,7 @@ static esp_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_
     cache_ptr = emote_get_cache_ptr_by_obj_type(handle, obj_type);
     ESP_GOTO_ON_FALSE(cache_ptr, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     src_data = emote_acquire_data(handle, icon->data, icon->size, cache_ptr);
     ESP_GOTO_ON_FALSE(src_data, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire animation data");
 
@@ -222,11 +222,11 @@ static esp_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_
     gfx_anim_set_segment(obj, 0, 0xFFFF, fps, loop);
     gfx_anim_start(obj);
     gfx_obj_set_visible(obj, true);
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 
 error:
     return ret;
@@ -246,10 +246,10 @@ static esp_err_t emote_set_label_text(emote_handle_t handle, emote_obj_type_t ob
         goto error;
     }
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     gfx_label_set_text(obj, text ? text : "");
     gfx_obj_set_visible(obj, true);
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error:
@@ -279,7 +279,7 @@ static esp_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type
     cache_ptr = emote_get_cache_ptr_by_obj_type(handle, obj_type);
     ESP_GOTO_ON_FALSE(cache_ptr, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     src_data = emote_acquire_data(handle, emoji->data, emoji->size, cache_ptr);
     ESP_GOTO_ON_FALSE(src_data, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire %s animation data", name);
 
@@ -288,11 +288,11 @@ static esp_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type
     gfx_anim_start(obj);
     gfx_obj_set_visible(obj, true);
 
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 
 error:
     return ret;
@@ -345,9 +345,9 @@ static esp_err_t emote_handle_speak_event(emote_handle_t handle, const char *mes
 
     gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
-        gfx_emote_lock(handle->gfx_emote_handle);
+        gfx_emote_lock(handle->gfx_handle);
         gfx_label_set_snap_loop(obj, false);
-        gfx_emote_unlock(handle->gfx_emote_handle);
+        gfx_emote_unlock(handle->gfx_handle);
     }
 
     return ret;
@@ -366,34 +366,18 @@ static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *m
 
     gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
-        gfx_emote_lock(handle->gfx_emote_handle);
+        gfx_emote_lock(handle->gfx_handle);
         gfx_label_set_snap_loop(obj, true);
-        gfx_emote_unlock(handle->gfx_emote_handle);
+        gfx_emote_unlock(handle->gfx_handle);
     }
 
     return ret;
 }
 
-static esp_err_t emote_handle_qrcode_set_event(emote_handle_t handle, const char *message)
+static esp_err_t emote_handle_off_event(emote_handle_t handle, const char *message)
 {
     esp_err_t ret = ESP_OK;
-
-    ESP_LOGI(TAG, "handle_qrcode_set_event: %s", message);
-    ret = emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_TOAST, message);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set label text");
-    }
-
-    ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_TIPS, true);
-
-    HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
-    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
-    if (obj) {
-        gfx_emote_lock(handle->gfx_emote_handle);
-        gfx_label_set_snap_loop(obj, true);
-        gfx_emote_unlock(handle->gfx_emote_handle);
-    }
-
+    // emote_set_eye_hidden(handle, true);
     return ret;
 }
 
@@ -481,14 +465,14 @@ esp_err_t emote_set_label_clock(emote_handle_t handle)
     char time_str[10];
     snprintf(time_str, sizeof(time_str), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     gfx_label_set_text(obj, time_str);
     gfx_obj_set_visible(obj, true);
 
     if (!gfx_timer_is_running(timer)) {
         gfx_timer_resume(timer);
     }
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error:
@@ -526,10 +510,10 @@ esp_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text)
     obj = handle->def_objects[EMOTE_DEF_OBJ_QRCODE].obj;
     ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "QRCODE object not found");
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     gfx_qrcode_set_data(obj, qrcode_text);
     gfx_obj_set_visible(obj, true);
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error:
@@ -542,11 +526,11 @@ esp_err_t emote_stop_anim_dialog(emote_handle_t handle)
 
     ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
 
     // Stop and delete timer if exists
     if (handle->dialog_timer) {
-        gfx_timer_delete(handle->gfx_emote_handle, handle->dialog_timer);
+        gfx_timer_delete(handle->gfx_handle, handle->dialog_timer);
         handle->dialog_timer = NULL;
     }
 
@@ -561,7 +545,7 @@ esp_err_t emote_stop_anim_dialog(emote_handle_t handle)
         free(entry->data.anim);
         entry->data.anim = NULL;
     }
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error:
@@ -580,33 +564,58 @@ esp_err_t emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint
         xSemaphoreTake(handle->emerg_dlg_done_sem, 0); // Clear semaphore if already set
     }
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     if (handle->dialog_timer) {
-        gfx_timer_delete(handle->gfx_emote_handle, handle->dialog_timer);
+        gfx_timer_delete(handle->gfx_handle, handle->dialog_timer);
         handle->dialog_timer = NULL;
     }
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 
     ret = emote_set_dialog_anim(handle, name);
     ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Failed to set dialog animation");
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
 
-    timer = gfx_timer_create(handle->gfx_emote_handle, emote_dialog_timer_cb, duration_ms, handle);
+    timer = gfx_timer_create(handle->gfx_handle, emote_dialog_timer_cb, duration_ms, handle);
     ESP_GOTO_ON_FALSE(timer, ESP_ERR_NO_MEM, error_unlock, TAG, "Failed to create dialog timer");
 
     gfx_timer_set_repeat_count(timer, 1);  // Execute only once
     handle->dialog_timer = timer;
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 
     return ESP_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     emote_stop_anim_dialog(handle);
 
 error:
     return ret;
+}
+
+esp_err_t emote_set_obj_visible(emote_handle_t handle, const char *name, bool visible)
+{
+    esp_err_t ret = ESP_OK;
+    gfx_obj_t *obj = NULL;
+
+    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+
+    obj = emote_get_obj_by_name(handle, name);
+    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Object not found");
+
+    gfx_emote_lock(handle->gfx_handle);
+    gfx_obj_set_visible(obj, visible);
+    gfx_emote_unlock(handle->gfx_handle);
+    return ESP_OK;
+
+error:
+    return ret;
+}
+
+esp_err_t emote_set_anim_visible(emote_handle_t handle, bool visible)
+{
+    emote_set_eye_hidden(handle, !visible);
+    return ESP_OK;
 }
 
 esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message)
@@ -618,7 +627,7 @@ esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const ch
 
     ESP_LOGD(TAG, "setEventMsg: %s, message: \"%s\"", event, message ? message : "");
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
 
     // Look up event handler in table
     for (size_t i = 0; i < EVENT_TABLE_SIZE; i++) {
@@ -649,11 +658,11 @@ esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const ch
     // Call event handler
     ret = entry->handler(handle, message);
 
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ret;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
 
 error:
     return ret;
@@ -665,9 +674,9 @@ esp_err_t emote_notify_flush_finished(emote_handle_t handle)
 
     ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_emote_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+    ESP_GOTO_ON_FALSE(handle->gfx_disp, ESP_ERR_INVALID_STATE, error, TAG, "GFX display handle not initialized");
 
-    gfx_emote_flush_ready(handle->gfx_emote_handle, true);
+    gfx_disp_flush_ready(handle->gfx_disp, true);
     return ESP_OK;
 
 error:
@@ -680,9 +689,9 @@ esp_err_t emote_notify_all_refresh(emote_handle_t handle)
 
     ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_emote_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+    ESP_GOTO_ON_FALSE(handle->gfx_disp, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
 
-    gfx_emote_refresh_all(handle->gfx_emote_handle);
+    gfx_disp_refresh_all(handle->gfx_disp);
     return ESP_OK;
 
 error:
@@ -696,9 +705,9 @@ esp_err_t emote_lock(emote_handle_t handle)
 
     ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_emote_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+    ESP_GOTO_ON_FALSE(handle->gfx_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
 
-    gfx_emote_lock(handle->gfx_emote_handle);
+    gfx_emote_lock(handle->gfx_handle);
     return ESP_OK;
 
 error:
@@ -712,9 +721,9 @@ esp_err_t emote_unlock(emote_handle_t handle)
 
     ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_emote_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+    ESP_GOTO_ON_FALSE(handle->gfx_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
 
-    gfx_emote_unlock(handle->gfx_emote_handle);
+    gfx_emote_unlock(handle->gfx_handle);
     return ESP_OK;
 
 error:

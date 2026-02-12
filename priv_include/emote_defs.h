@@ -92,7 +92,8 @@ typedef struct emote_custom_obj_entry_s {
 struct emote_s {
     bool is_initialized;
 
-    gfx_handle_t gfx_emote_handle;
+    gfx_handle_t gfx_handle;
+    gfx_disp_t *gfx_disp;
     mmap_assets_handle_t assets_handle;
 
     /** Default objects with integrated cache

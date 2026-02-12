@@ -22,7 +22,7 @@ extern "C" {
 #define EMOTE_MGR_EVT_SYS               "evt_sys"
 #define EMOTE_MGR_EVT_SET               "evt_set"
 #define EMOTE_MGR_EVT_BAT               "evt_bat"
-#define EMOTE_MGR_EVT_QRCODE            "evt_qrcode"
+#define EMOTE_MGR_EVT_OFF               "evt_off"
 
 /**
  * @brief UI element name constants
@@ -111,7 +111,6 @@ esp_err_t emote_wait_emerg_dlg_done(emote_handle_t handle, uint32_t timeout_ms);
  */
 esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message);
 
-
 /**
  * @brief Get graphics object by name
  * @param handle Handle to emote manager
@@ -129,6 +128,22 @@ gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name);
  */
 gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *type_str, const char *name);
 
+/**
+ * @brief Set object visible
+ * @param handle Handle to emote manager
+ * @param name Object name
+ * @param visible True to make object visible, false to hide
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t emote_set_obj_visible(emote_handle_t handle, const char *name, bool visible);
+
+/**
+ * @brief Set face visible
+ * @param handle Handle to emote manager
+ * @param visible True to make face visible, false to hide
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t emote_set_anim_visible(emote_handle_t handle, bool visible);
 
 /**
  * @brief Lock the emote manager
