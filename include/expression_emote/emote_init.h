@@ -38,7 +38,7 @@ typedef struct {
 
 // ===== FLUSH READY CALLBACK =====
 typedef void (*emote_flush_ready_cb_t)(int x_start, int y_start, int x_end, int y_end, const void *data, emote_handle_t manager);
-typedef void (*emote_update_cb_t)(gfx_player_event_t event, const void *obj, emote_handle_t manager);
+typedef void (*emote_update_cb_t)(gfx_disp_event_t event, const void *obj, emote_handle_t manager);
 
 typedef struct {
     struct {

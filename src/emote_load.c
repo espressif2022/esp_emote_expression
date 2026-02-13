@@ -229,7 +229,7 @@ esp_err_t emote_unmount_assets(emote_handle_t handle)
     }
 
     if (handle->assets_handle) {
-        ESP_LOGI(TAG, "Unmounting assets handle: %p", handle->assets_handle);
+        ESP_LOGI(TAG, "Unmounting assets handle");
         mmap_assets_del(handle->assets_handle);
         handle->assets_handle = NULL;
     }
@@ -275,7 +275,7 @@ esp_err_t emote_mount_assets(emote_handle_t handle, const emote_data_t *data)
 
     for (int i = 0; i < num; i++) {
         const char *name = mmap_assets_get_name(handle->assets_handle, i);
-        ESP_LOGI(TAG, "Found file: %d, %s", i, name);
+        ESP_LOGD(TAG, "Found file: %d, %s", i, name);
     }
 
     return ESP_OK;
@@ -464,6 +464,14 @@ static esp_err_t emote_load_layouts(emote_handle_t handle, cJSON *root)
         }
     }
 
+    if (ret == ESP_OK) {
+        gfx_obj_t *obj_default = handle->def_objects[EMOTE_DEF_OBJ_LEBAL_DEFAULT].obj;
+        if (obj_default) {
+            gfx_obj_delete(obj_default);
+            handle->def_objects[EMOTE_DEF_OBJ_LEBAL_DEFAULT].obj = NULL;
+        }
+    }
+
     return ESP_OK;
 
 error:
@@ -514,6 +522,23 @@ esp_err_t emote_load_assets(emote_handle_t handle)
 
     ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
+    // Create hash tables if they don't exist
+    if (!handle->emoji_table) {
+        handle->emoji_table = emote_assets_table_create("emoji");
+        ESP_GOTO_ON_FALSE(handle->emoji_table, ESP_ERR_NO_MEM, error, TAG, "Failed to create emoji_table hash table");
+    }
+
+    if (!handle->icon_table) {
+        handle->icon_table = emote_assets_table_create("icon");
+        ESP_GOTO_ON_FALSE(handle->icon_table, ESP_ERR_NO_MEM, error, TAG, "Failed to create icon_table hash table");
+    }
+
+    // Create semaphore for emergency dialog animation completion
+    if (!handle->emerg_dlg_done_sem) {
+        handle->emerg_dlg_done_sem = xSemaphoreCreateBinary();
+        ESP_GOTO_ON_FALSE(handle->emerg_dlg_done_sem, ESP_ERR_NO_MEM, error, TAG, "Failed to create emerg_dlg_done_sem");
+    }
+
     ret = emote_get_asset_data_by_name(handle, EMOTE_INDEX_JSON_FILENAME, &asset_data, &asset_size);
     ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Failed to find %s in assets", EMOTE_INDEX_JSON_FILENAME);
 
@@ -556,6 +581,107 @@ error_free_buf:
     if (internal_buf) {
         free(internal_buf);
     }
+
+error:
+    return ret;
+}
+
+esp_err_t emote_unload_assets(emote_handle_t handle)
+{
+    esp_err_t ret = ESP_OK;
+
+    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+
+    // Cleanup objects
+    if (handle->gfx_handle) {
+        gfx_emote_lock(handle->gfx_handle);
+        // Cleanup def_objects
+        for (int i = EMOTE_DEF_OBJ_ANIM_EYE; i < EMOTE_DEF_OBJ_MAX; i++) {
+            emote_def_obj_entry_t *entry = &handle->def_objects[i];
+            if (entry->obj) {
+                if (i == EMOTE_DEF_OBJ_TIMER_STATUS) {
+                    gfx_timer_delete(handle->gfx_handle, (gfx_timer_handle_t)entry->obj);
+                } else {
+                    gfx_obj_delete(entry->obj);
+                }
+                entry->obj = NULL;
+            }
+            // Cleanup cache based on object type
+            if (i >= EMOTE_DEF_OBJ_ANIM_EYE && i <= EMOTE_DEF_OBJ_ANIM_EMERG_DLG) {
+                if (entry->data.anim) {
+                    if (entry->data.anim->cache) {
+                        free(entry->data.anim->cache);
+                    }
+                    free(entry->data.anim);
+                    entry->data.anim = NULL;
+                }
+            } else if (i == EMOTE_DEF_OBJ_ICON_STATUS || i == EMOTE_DEF_OBJ_ICON_CHARGE) {
+                if (entry->data.img) {
+                    if (entry->data.img->cache) {
+                        free(entry->data.img->cache);
+                    }
+                    free(entry->data.img);
+                    entry->data.img = NULL;
+                }
+            }
+        }
+
+        // Cleanup custom objects created by load_layouts
+        emote_custom_obj_entry_t *custom_entry = handle->custom_objects;
+        while (custom_entry) {
+            emote_custom_obj_entry_t *next = custom_entry->next;
+            if (custom_entry->obj) {
+                gfx_obj_delete(custom_entry->obj);
+            }
+            if (custom_entry->name) {
+                free(custom_entry->name);
+            }
+            free(custom_entry);
+            custom_entry = next;
+        }
+        handle->custom_objects = NULL;
+
+        // Cleanup emergency dialog timer
+        if (handle->dialog_timer) {
+            gfx_timer_delete(handle->gfx_handle, handle->dialog_timer);
+            handle->dialog_timer = NULL;
+        }
+
+        gfx_emote_unlock(handle->gfx_handle);
+    }
+
+    // Cleanup semaphore for emergency dialog animation completion
+    if (handle->emerg_dlg_done_sem) {
+        vSemaphoreDelete(handle->emerg_dlg_done_sem);
+        handle->emerg_dlg_done_sem = NULL;
+    }
+
+    // Cleanup emoji table (destroy and recreate to clear all entries)
+    if (handle->emoji_table) {
+        emote_assets_table_destroy(handle->emoji_table);
+        handle->emoji_table = NULL;
+    }
+
+    // Cleanup icon table (destroy and recreate to clear all entries)
+    if (handle->icon_table) {
+        emote_assets_table_destroy(handle->icon_table);
+        handle->icon_table = NULL;
+    }
+
+    // Release font cache
+    if (handle->font_cache) {
+        free(handle->font_cache);
+        handle->font_cache = NULL;
+    }
+
+    // Cleanup font
+    if (handle->gfx_font) {
+        gfx_font_lv_delete(handle->gfx_font);
+        handle->gfx_font = NULL;
+    }
+
+    ESP_LOGI(TAG, "Unload assets");
+    return ESP_OK;
 
 error:
     return ret;

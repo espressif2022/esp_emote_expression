@@ -46,6 +46,13 @@ esp_err_t emote_unmount_assets(emote_handle_t handle);
 esp_err_t emote_load_assets(emote_handle_t handle);
 
 /**
+ * @brief Unload assets data (free emojis, icons, fonts loaded by emote_load_assets)
+ * @param handle Handle to emote manager
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t emote_unload_assets(emote_handle_t handle);
+
+/**
  * @brief Load assets from source (mount + load data)
  * @param handle Handle to emote manager
  * @param data Source data structure
