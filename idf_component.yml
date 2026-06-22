@@ -20,12 +20,14 @@ dependencies:
     public: true
 
   espressif/esp_mmap_assets:
-    version: '1.*'
+    version: '2.*'
     public: true
 
   espressif2022/esp_emote_gfx:
-    version: '<=3.0.5'
+    version: "*"
+    override_path: "../esp_emote_gfx"
     public: true
 
   espressif2022/esp_emote_assets:
     version: '^0.1.0'
+    public: true

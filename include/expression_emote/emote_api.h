@@ -58,120 +58,120 @@ extern "C" {
  * @brief Set emoji animation on eye object
  * @param handle Handle to emote manager
  * @param name Name of the emoji animation
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name);
+gfx_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name);
 
 /**
  * @brief Set QR code data
  * @param handle Handle to emote manager
  * @param qrcode_text QR code text
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text);
+gfx_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text);
 
 /**
  * @brief Set emergency dialog animation
  * @param handle Handle to emote manager
  * @param name Name of the emoji animation
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name);
+gfx_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name);
 
 /**
  * @brief Insert emergency dialog animation with auto-stop timer
  * @param handle Handle to emote manager
  * @param name Name of the emoji animation
  * @param duration_ms Duration in milliseconds before auto-stopping
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms);
+gfx_err_t emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms);
 
 /**
  * @brief Stop emergency dialog animation
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_stop_anim_dialog(emote_handle_t handle);
+gfx_err_t emote_stop_anim_dialog(emote_handle_t handle);
 
 /**
  * @brief Wait for emergency dialog animation completion
  * @param handle Handle to emote manager
  * @param timeout_ms Timeout in milliseconds (0 = wait forever)
- * @return ESP_OK on success, ESP_ERR_TIMEOUT on timeout, error code on failure
+ * @return GFX_OK on success, GFX_ERR_TIMEOUT on timeout, error code on failure
  */
-esp_err_t emote_wait_emerg_dlg_done(emote_handle_t handle, uint32_t timeout_ms);
+gfx_err_t emote_wait_emerg_dlg_done(emote_handle_t handle, uint32_t timeout_ms);
 
 /**
  * @brief Set system event with message
  * @param handle Handle to emote manager
  * @param event Event type string
  * @param message Message string
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message);
+gfx_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message);
 
 /**
  * @brief Get graphics object by name
  * @param handle Handle to emote manager
  * @param name Object name (predefined or custom)
- * @return Pointer to gfx_obj_t on success, NULL if object not found
+ * @return Pointer to gfx_object_t on success, NULL if object not found
  */
-gfx_obj_t *emote_get_obj_by_name(emote_handle_t handle, const char *name);
+gfx_object_t *emote_get_obj_by_name(emote_handle_t handle, const char *name);
 
 /**
  * @brief Create object by type string (for custom objects)
  * @param handle Handle to emote manager
  * @param type_str Object type string: "anim", "image"/"img", "label", "qrcode", "timer"
  * @param name Object name (must be unique, not conflict with predefined names)
- * @return Pointer to gfx_obj_t on success, NULL on failure
+ * @return Pointer to gfx_object_t on success, NULL on failure
  */
-gfx_obj_t *emote_create_obj_by_type(emote_handle_t handle, const char *type_str, const char *name);
+gfx_object_t *emote_create_obj_by_type(emote_handle_t handle, const char *type_str, const char *name);
 
 /**
  * @brief Set object visible
  * @param handle Handle to emote manager
  * @param name Object name
  * @param visible True to make object visible, false to hide
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_set_obj_visible(emote_handle_t handle, const char *name, bool visible);
+gfx_err_t emote_set_obj_visible(emote_handle_t handle, const char *name, bool visible);
 
 /**
  * @brief Set face visible
  * @param handle Handle to emote manager
  * @param visible True to make face visible, false to hide
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_set_anim_visible(emote_handle_t handle, bool visible);
+gfx_err_t emote_set_anim_visible(emote_handle_t handle, bool visible);
 
 /**
  * @brief Lock the emote manager
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_lock(emote_handle_t handle);
+gfx_err_t emote_lock(emote_handle_t handle);
 
 /**
  * @brief Unlock the emote manager
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_unlock(emote_handle_t handle);
+gfx_err_t emote_unlock(emote_handle_t handle);
 
 /**
  * @brief Notify that flush operation is finished
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_notify_flush_finished(emote_handle_t handle);
+gfx_err_t emote_notify_flush_finished(emote_handle_t handle);
 
 /**
  * @brief Notify that all refresh operation is finished
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_notify_all_refresh(emote_handle_t handle);
+gfx_err_t emote_notify_all_refresh(emote_handle_t handle);
 
 /**
  * @brief Get user data

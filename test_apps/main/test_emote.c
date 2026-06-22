@@ -89,20 +89,20 @@ static void test_emote_custom(emote_handle_t handle)
         return;
     }
 
-    gfx_obj_t *custom_label = emote_create_obj_by_type(handle, EMOTE_OBJ_TYPE_LABEL, "custom_label");
+    gfx_object_t *custom_label = emote_create_obj_by_type(handle, EMOTE_OBJ_TYPE_LABEL, "custom_label");
     if (custom_label) {
         emote_lock(handle);
         gfx_label_set_text(custom_label, "Custom Label");
         gfx_label_set_color(custom_label, GFX_COLOR_HEX(0xFF0000));
-        gfx_obj_set_size(custom_label, 200, 30);
-        gfx_obj_align(custom_label, GFX_ALIGN_CENTER, 0, 0);
+        gfx_object_set_size(custom_label, 200, 30);
+        gfx_object_align(custom_label, GFX_ALIGN_CENTER, 0, 0);
         emote_unlock(handle);
     }
 
     test_app_wait_ms(2 * 1000);
 
     emote_set_event_msg(handle, EMOTE_MGR_EVT_SPEAK, "");
-    gfx_obj_t *toast_label = emote_get_obj_by_name(handle, "toast_label");
+    gfx_object_t *toast_label = emote_get_obj_by_name(handle, "toast_label");
     if (toast_label) {
         emote_lock(handle);
         gfx_label_set_text(toast_label, "Toast Label Updated");
@@ -119,11 +119,16 @@ static void test_emote_custom(emote_handle_t handle)
     s_img_dsc.data = (const uint8_t *)icon_data->data + sizeof(gfx_image_header_t);
     s_img_dsc.data_size = icon_data->size - sizeof(gfx_image_header_t);
 
-    gfx_obj_t *custom_img = emote_create_obj_by_type(handle, EMOTE_OBJ_TYPE_IMAGE, "custom_image");
+    gfx_object_t *custom_img = emote_create_obj_by_type(handle, EMOTE_OBJ_TYPE_IMAGE, "custom_image");
     emote_lock(handle);
-    gfx_img_set_src(custom_img, &s_img_dsc);
-    gfx_obj_set_visible(custom_img, true);
-    gfx_obj_align(custom_img, GFX_ALIGN_CENTER, 0, 50);
+    const gfx_image_src_t img_src = {
+        .type = GFX_IMAGE_SRC_TYPE_IMAGE_DSC,
+        .data = &s_img_dsc,
+        .data_len = s_img_dsc.data_size,
+    };
+    gfx_image_set_source_desc(custom_img, &img_src);
+    gfx_object_set_visible(custom_img, true);
+    gfx_object_align(custom_img, GFX_ALIGN_CENTER, 0, 50);
     emote_unlock(handle);
 
     test_app_wait_ms(2 * 1000);
@@ -131,13 +136,18 @@ static void test_emote_custom(emote_handle_t handle)
     emoji_data_t *emoji_data = NULL;
     emote_get_emoji_data_by_name(handle, "happy", &emoji_data);
 
-    gfx_obj_t *custom_anim = emote_create_obj_by_type(handle, EMOTE_OBJ_TYPE_ANIM, "custom_anim");
+    gfx_object_t *custom_anim = emote_create_obj_by_type(handle, EMOTE_OBJ_TYPE_ANIM, "custom_anim");
     emote_lock(handle);
-    gfx_anim_set_src(custom_anim, emoji_data->data, emoji_data->size);
+    const gfx_anim_src_t anim_src = {
+        .type = GFX_ANIM_SRC_TYPE_MEMORY,
+        .data = emoji_data->data,
+        .data_len = emoji_data->size,
+    };
+    gfx_anim_set_src_desc(custom_anim, &anim_src);
     gfx_anim_set_segment(custom_anim, 0, 0xFFFF, emoji_data->fps, emoji_data->loop);
     gfx_anim_start(custom_anim);
-    gfx_obj_set_visible(custom_anim, true);
-    gfx_obj_align(custom_anim, GFX_ALIGN_CENTER, 0, 0);
+    gfx_object_set_visible(custom_anim, true);
+    gfx_object_align(custom_anim, GFX_ALIGN_CENTER, 0, 0);
     emote_unlock(handle);
 
     test_app_wait_ms(3 * 1000);

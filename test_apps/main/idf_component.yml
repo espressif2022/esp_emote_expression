@@ -30,3 +30,7 @@ dependencies:
   espressif2022/esp_emote_expression:
     version: "*"
     override_path: "../../"
+
+  espressif2022/esp_emote_gfx:
+    version: "*"
+    override_path: "../../../esp_emote_gfx"

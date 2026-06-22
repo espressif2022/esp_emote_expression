@@ -81,11 +81,11 @@ static bool test_flush_dpi_panel_ready_callback(esp_lcd_panel_handle_t panel_io,
 }
 #endif
 
-static void test_update_callback(gfx_disp_event_t event, const void *obj, emote_handle_t handle)
+static void test_update_callback(gfx_display_event_t event, const void *obj, emote_handle_t handle)
 {
     if (handle) {
-        gfx_obj_t *wait_obj = emote_get_obj_by_name(handle, EMT_DEF_ELEM_EMERG_DLG);
-        if (wait_obj == obj && event == GFX_DISP_EVENT_ALL_FRAME_DONE) {
+        gfx_object_t *wait_obj = emote_get_obj_by_name(handle, EMT_DEF_ELEM_EMERG_DLG);
+        if (wait_obj == obj && event == GFX_DISPLAY_EVENT_ALL_FRAME_DONE) {
             ESP_LOGI(TAG, "Emergency dialog done: %p, event: %d", obj, event);
         }
     }

@@ -11,6 +11,14 @@
 extern "C" {
 #endif
 
+/** How asset file bytes are exposed after mount. */
+typedef enum {
+    /** Partition mmap: flash-backed direct pointers (zero-copy borrow). */
+    EMOTE_ASSETS_ADDR_DIRECT = 0,
+    /** Pack file / host dir / partition read: copy-backed heap data. */
+    EMOTE_ASSETS_ADDR_COPY,
+} emote_assets_addr_mode_t;
+
 typedef struct {
     const void *data;
     size_t size;
@@ -27,56 +35,56 @@ typedef struct {
  * @brief Mount assets from source
  * @param handle Handle to emote manager
  * @param data Source data structure
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_mount_assets(emote_handle_t handle, const emote_data_t *data);
+gfx_err_t emote_mount_assets(emote_handle_t handle, const emote_data_t *data);
 
 /**
  * @brief Unmount assets
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_unmount_assets(emote_handle_t handle);
+gfx_err_t emote_unmount_assets(emote_handle_t handle);
 
 /**
  * @brief Load assets data (parse JSON and load emojis, icons, layouts, fonts)
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_load_assets(emote_handle_t handle);
+gfx_err_t emote_load_assets(emote_handle_t handle);
 
 /**
  * @brief Unload assets data (free emojis, icons, fonts loaded by emote_load_assets)
  * @param handle Handle to emote manager
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_unload_assets(emote_handle_t handle);
+gfx_err_t emote_unload_assets(emote_handle_t handle);
 
 /**
  * @brief Load assets from source (mount + load data)
  * @param handle Handle to emote manager
  * @param data Source data structure
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_mount_and_load_assets(emote_handle_t handle, const emote_data_t *data);
+gfx_err_t emote_mount_and_load_assets(emote_handle_t handle, const emote_data_t *data);
 
 /**
  * @brief Get parsed icon data by name (from parsed icon table)
  * @param handle Handle to emote manager
  * @param name Icon name
  * @param icon Icon data pointer (output parameter)
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon);
+gfx_err_t emote_get_icon_data_by_name(emote_handle_t handle, const char *name, icon_data_t **icon);
 
 /**
  * @brief Get parsed emoji data by name (from parsed emoji table)
  * @param handle Handle to emote manager
  * @param name Emoji name
  * @param emoji Emoji data pointer (output parameter)
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji);
+gfx_err_t emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, emoji_data_t **emoji);
 
 /**
  * @brief Get asset file data by name (raw file data from asset bin)
@@ -84,9 +92,16 @@ esp_err_t emote_get_emoji_data_by_name(emote_handle_t handle, const char *name, 
  * @param name Asset file name
  * @param data Pointer to store asset data pointer (output parameter)
  * @param size Pointer to store asset data size (output parameter)
- * @return ESP_OK on success, error code on failure
+ * @return GFX_OK on success, error code on failure
  */
-esp_err_t emote_get_asset_data_by_name(emote_handle_t handle, const char *name, const uint8_t **data, size_t *size);
+gfx_err_t emote_get_asset_data_by_name(emote_handle_t handle, const char *name, const uint8_t **data, size_t *size);
+
+/**
+ * @brief Get how mounted asset bytes are addressed.
+ * @param handle Handle to emote manager
+ * @return Addressing mode, or EMOTE_ASSETS_ADDR_COPY if not mounted
+ */
+emote_assets_addr_mode_t emote_get_assets_addr_mode(emote_handle_t handle);
 
 #ifdef __cplusplus
 }

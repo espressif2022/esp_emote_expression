@@ -7,10 +7,33 @@
 
 #include "sdkconfig.h"
 #include "expression_emote.h"
-#include "esp_mmap_assets.h"
 #include "gfx.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "gfx/fs.h"
+#include "platform/gfx_platform.h"
+
+#define EMOTE_EMERG_DLG_DONE_BIT 0x01U
+
+static inline gfx_err_t emote_gfx_image_set_dsc(gfx_object_t *obj, const gfx_image_dsc_t *dsc)
+{
+    const gfx_image_src_t src = {
+        .type = GFX_IMAGE_SRC_TYPE_IMAGE_DSC,
+        .data = dsc,
+        .data_len = dsc != NULL ? dsc->data_size : 0U,
+    };
+
+    return gfx_image_set_source_desc(obj, &src);
+}
+
+static inline gfx_err_t emote_gfx_anim_set_memory(gfx_object_t *obj, const void *data, size_t data_len)
+{
+    const gfx_anim_src_t src = {
+        .type = GFX_ANIM_SRC_TYPE_MEMORY,
+        .data = data,
+        .data_len = data_len,
+    };
+
+    return gfx_anim_set_src_desc(obj, &src);
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +41,7 @@ extern "C" {
 
 // Forward declaration
 typedef struct assets_hash_table_s assets_hash_table_t;
+typedef struct emote_asset_blob_entry_s emote_asset_blob_entry_t;
 
 // ===== DEFAULT VALUES =====
 #define EMOTE_DEF_SCROLL_SPEED          CONFIG_EMOTE_DEF_SCROLL_SPEED
@@ -79,13 +103,13 @@ typedef union {
  *  Automatically associates user data based on object type using union
  */
 typedef struct {
-    gfx_obj_t *obj;                    // Object pointer
+    gfx_object_t *obj;                    // Object pointer
     emote_obj_data_t data;    // User data union, automatically matches by type
 } emote_def_obj_entry_t;
 
 typedef struct emote_custom_obj_entry_s {
     char *name;                    // Object name (dynamically allocated)
-    gfx_obj_t *obj;                // Object pointer
+    gfx_object_t *obj;                // Object pointer
     struct emote_custom_obj_entry_s *next;  // Next entry in linked list
 } emote_custom_obj_entry_t;
 
@@ -93,8 +117,9 @@ struct emote_s {
     bool is_initialized;
 
     gfx_handle_t gfx_handle;
-    gfx_disp_t *gfx_disp;
-    mmap_assets_handle_t assets_handle;
+    gfx_display_t *gfx_disp;
+    gfx_fs_t *assets_fs;
+    emote_asset_blob_entry_t *asset_blobs;
 
     /** Default objects with integrated cache
      *  Cache is automatically associated based on object type
@@ -116,8 +141,8 @@ struct emote_s {
     //dialog timer [EMOTE_DEF_OBJ_ANIM_EMERG_DLG]
     gfx_timer_handle_t dialog_timer;
 
-    //signal for emergency dialog animation completion
-    SemaphoreHandle_t emerg_dlg_done_sem;
+    // Event bit set when emergency dialog animation completes
+    gfx_platform_event_t emerg_dlg_done_event;
 
     //callback
     emote_flush_ready_cb_t flush_cb;
