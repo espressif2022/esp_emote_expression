@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This workflow builds test_apps for multiple IDF versions.
+# This workflow builds host simulation and test_apps for multiple IDF versions.
 
 name: "Build test_apps"
 
@@ -27,6 +27,25 @@ permissions:
   contents: read
 
 jobs:
+  build-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install host build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libsdl2-dev libjpeg-dev
+
+      - name: Build host SDL simulation (FetchContent esp_emote_gfx)
+        run: |
+          cmake -S . -B build-host-sdl \
+            -DBUILD_TESTING=ON \
+            -DESP_EMOTE_GFX_REF=feat/sdl_support
+          cmake --build build-host-sdl --target gfx_host_expression_demo --parallel
+          ctest --test-dir build-host-sdl --output-on-failure -R gfx_host_expression_dummy_smoke
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120

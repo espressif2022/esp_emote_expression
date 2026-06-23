@@ -4,16 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-#include "esp_check.h"
+#define GFX_LOG_MODULE GFX_LOG_MODULE_CORE
+#include "common/gfx_check.h"
+#include "common/gfx_log_priv.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <time.h>
 
 #include "expression_emote.h"
-#include "esp_mmap_assets.h"
 
 #include "emote_defs.h"
 #include "emote_table.h"
@@ -23,19 +22,19 @@
 static const char *TAG = "Expression_op";
 
 #define HIDE_OBJ(handle, obj_type) do { \
-    gfx_obj_t *obj = (handle)->def_objects[obj_type].obj; \
-    if (obj) gfx_obj_set_visible(obj, false); \
+    gfx_object_t *obj = (handle)->def_objects[obj_type].obj; \
+    if (obj) gfx_object_set_visible(obj, false); \
 } while(0)
 
 #define SHOW_OBJ(handle, obj_type) do { \
-    gfx_obj_t *obj = (handle)->def_objects[obj_type].obj; \
-    if (obj) gfx_obj_set_visible(obj, true); \
+    gfx_object_t *obj = (handle)->def_objects[obj_type].obj; \
+    if (obj) gfx_object_set_visible(obj, true); \
 } while(0)
 
 #define EVENT_TABLE_SIZE (sizeof(event_table) / sizeof(event_table[0]))
 
 // ===== Type Definitions =====
-typedef esp_err_t (*emote_event_handler_t)(emote_handle_t handle, const char *message);
+typedef gfx_err_t (*emote_event_handler_t)(emote_handle_t handle, const char *message);
 
 typedef struct {
     const char *event_name;
@@ -50,19 +49,19 @@ static gfx_image_dsc_t *emote_get_img_dsc_by_obj_type(emote_handle_t handle, emo
 static void emote_set_eye_hidden(emote_handle_t handle, bool hidden);
 
 // UI helper functions
-static esp_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type, const char *name, bool visible);
-static esp_err_t emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type, const char *text);
-static esp_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type_t obj_type, const char *name);
-static esp_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_t obj_type,
+static gfx_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type, const char *name, bool visible);
+static gfx_err_t emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type, const char *text);
+static gfx_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type_t obj_type, const char *name);
+static gfx_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_t obj_type,
         const char *name, uint8_t fps, bool loop);
 
 // Event handler functions
-static esp_err_t emote_handle_idle_event(emote_handle_t handle, const char *message);
-static esp_err_t emote_handle_listen_event(emote_handle_t handle, const char *message);
-static esp_err_t emote_handle_speak_event(emote_handle_t handle, const char *message);
-static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *message);
-static esp_err_t emote_handle_off_event(emote_handle_t handle, const char *message);
-static esp_err_t emote_handle_bat_event(emote_handle_t handle, const char *message);
+static gfx_err_t emote_handle_idle_event(emote_handle_t handle, const char *message);
+static gfx_err_t emote_handle_listen_event(emote_handle_t handle, const char *message);
+static gfx_err_t emote_handle_speak_event(emote_handle_t handle, const char *message);
+static gfx_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *message);
+static gfx_err_t emote_handle_off_event(emote_handle_t handle, const char *message);
+static gfx_err_t emote_handle_bat_event(emote_handle_t handle, const char *message);
 
 // Timer callback
 static void emote_dialog_timer_cb(void *data);
@@ -139,192 +138,194 @@ static void emote_set_eye_hidden(emote_handle_t handle, bool hidden)
         return;
     }
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     if (hidden) {
         HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     } else {
         SHOW_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     }
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 }
 
 // UI helper functions
-static esp_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type, const char *name, bool visible)
+static gfx_err_t emote_set_icon_image(emote_handle_t handle, emote_obj_type_t obj_type, const char *name, bool visible)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
     icon_data_t *icon = NULL;
-    gfx_obj_t *obj = NULL;
+    gfx_object_t *obj = NULL;
     void **cache_ptr = NULL;
     gfx_image_dsc_t *img_dsc = NULL;
     const void *src_data = NULL;
 
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle && name, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     ret = emote_get_icon_data_by_name(handle, name, &icon);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found:\"%s\"", name);
+    GFX_GOTO_ON_FALSE(ret == GFX_OK, ret, error, TAG, "Not found:\"%s\"", name);
 
     obj = handle->def_objects[obj_type].obj;
-    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "object not found");
+    GFX_GOTO_ON_FALSE(obj, GFX_ERR_INVALID_STATE, error, TAG, "object not found");
 
-    ESP_GOTO_ON_FALSE(icon->data, ESP_ERR_INVALID_STATE, error, TAG, "icon.data is null");
+    GFX_GOTO_ON_FALSE(icon->data, GFX_ERR_INVALID_STATE, error, TAG, "icon.data is null");
 
     cache_ptr = emote_get_cache_ptr_by_obj_type(handle, obj_type);
-    ESP_GOTO_ON_FALSE(cache_ptr, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
+    GFX_GOTO_ON_FALSE(cache_ptr, GFX_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
 
     img_dsc = emote_get_img_dsc_by_obj_type(handle, obj_type);
-    ESP_GOTO_ON_FALSE(img_dsc, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get image descriptor for object type %d", obj_type);
+    GFX_GOTO_ON_FALSE(img_dsc, GFX_ERR_INVALID_STATE, error, TAG, "Failed to get image descriptor for object type %d", obj_type);
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     src_data = emote_acquire_data(handle, icon->data, icon->size, cache_ptr);
-    ESP_GOTO_ON_FALSE(src_data, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire icon data");
+    GFX_GOTO_ON_FALSE(src_data, GFX_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire icon data");
 
     memcpy(&img_dsc->header, src_data, sizeof(gfx_image_header_t));
     img_dsc->data = (const uint8_t *)src_data + sizeof(gfx_image_header_t);
     img_dsc->data_size = icon->size - sizeof(gfx_image_header_t);
 
-    gfx_img_set_src(obj, img_dsc);
-    gfx_obj_set_visible(obj, visible);
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    emote_gfx_image_set_dsc(obj, img_dsc);
+    gfx_object_set_visible(obj, visible);
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 
 error:
     return ret;
 }
 
-static esp_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_t obj_type,
+static gfx_err_t emote_set_icon_animation(emote_handle_t handle, emote_obj_type_t obj_type,
         const char *name, uint8_t fps, bool loop)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
     icon_data_t *icon = NULL;
-    gfx_obj_t *obj = NULL;
+    gfx_object_t *obj = NULL;
     void **cache_ptr = NULL;
     const void *src_data = NULL;
 
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle && name, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     ret = emote_get_icon_data_by_name(handle, name, &icon);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found:\"%s\"", name);
+    GFX_GOTO_ON_FALSE(ret == GFX_OK, ret, error, TAG, "Not found:\"%s\"", name);
 
     obj = handle->def_objects[obj_type].obj;
-    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Object not found");
+    GFX_GOTO_ON_FALSE(obj, GFX_ERR_INVALID_STATE, error, TAG, "Object not found");
 
     cache_ptr = emote_get_cache_ptr_by_obj_type(handle, obj_type);
-    ESP_GOTO_ON_FALSE(cache_ptr, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
+    GFX_GOTO_ON_FALSE(cache_ptr, GFX_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     src_data = emote_acquire_data(handle, icon->data, icon->size, cache_ptr);
-    ESP_GOTO_ON_FALSE(src_data, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire animation data");
+    GFX_GOTO_ON_FALSE(src_data, GFX_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire animation data");
 
-    gfx_anim_set_src(obj, src_data, icon->size);
+    emote_gfx_anim_set_memory(obj, src_data, icon->size);
     gfx_anim_set_segment(obj, 0, 0xFFFF, fps, loop);
     gfx_anim_start(obj);
-    gfx_obj_set_visible(obj, true);
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_object_set_visible(obj, true);
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 
 error:
     return ret;
 }
 
-static esp_err_t emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type,
+static gfx_err_t emote_set_label_text(emote_handle_t handle, emote_obj_type_t obj_type,
                                       const char *text)
 {
-    esp_err_t ret = ESP_OK;
-    gfx_obj_t *obj = NULL;
+    gfx_err_t ret = GFX_OK;
+    gfx_object_t *obj = NULL;
 
-    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     obj = handle->def_objects[obj_type].obj;
     if (!obj && !(obj = handle->def_objects[EMOTE_DEF_OBJ_LEBAL_DEFAULT].obj)) {
-        ret = ESP_ERR_INVALID_STATE;
+        ret = GFX_ERR_INVALID_STATE;
         goto error;
     }
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     gfx_label_set_text(obj, text ? text : "");
-    gfx_obj_set_visible(obj, true);
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_object_set_visible(obj, true);
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-static esp_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type_t obj_type,
+static gfx_err_t emote_set_emoji_animation(emote_handle_t handle, emote_obj_type_t obj_type,
         const char *name)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
     emoji_data_t *emoji = NULL;
-    gfx_obj_t *obj = NULL;
+    gfx_object_t *obj = NULL;
     void **cache_ptr = NULL;
     const void *src_data = NULL;
+    gfx_err_t gfx_ret;
 
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle && name, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     ret = emote_get_emoji_data_by_name(handle, name, &emoji);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Not found:\"%s\"", name);
+    GFX_GOTO_ON_FALSE(ret == GFX_OK, ret, error, TAG, "Not found:\"%s\"", name);
 
-    ESP_LOGD(TAG, "Setting emoji: %s (fps=%d, loop=%s)",
+    GFX_LOGD(TAG, "Setting emoji: %s (fps=%d, loop=%s)",
              name, emoji->fps, emoji->loop ? "true" : "false");
 
     obj = handle->def_objects[obj_type].obj;
-    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "%s object not found", name);
+    GFX_GOTO_ON_FALSE(obj, GFX_ERR_INVALID_STATE, error, TAG, "%s object not found", name);
 
     cache_ptr = emote_get_cache_ptr_by_obj_type(handle, obj_type);
-    ESP_GOTO_ON_FALSE(cache_ptr, ESP_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
+    GFX_GOTO_ON_FALSE(cache_ptr, GFX_ERR_INVALID_STATE, error, TAG, "Failed to get cache pointer for object type %d", obj_type);
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     src_data = emote_acquire_data(handle, emoji->data, emoji->size, cache_ptr);
-    ESP_GOTO_ON_FALSE(src_data, ESP_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire %s animation data", name);
+    GFX_GOTO_ON_FALSE(src_data, GFX_ERR_INVALID_STATE, error_unlock, TAG, "Failed to acquire %s animation data", name);
 
-    gfx_anim_set_src(obj, src_data, emoji->size);
+    gfx_ret = emote_gfx_anim_set_memory(obj, src_data, emoji->size);
+    GFX_GOTO_ON_FALSE(gfx_ret == GFX_OK, GFX_FAIL, error_unlock, TAG, "Failed to set %s animation source", name);
     gfx_anim_set_segment(obj, 0, 0xFFFF, emoji->fps > 0 ? emoji->fps : EMOTE_DEF_ANIMATION_FPS, emoji->loop);
     gfx_anim_start(obj);
-    gfx_obj_set_visible(obj, true);
+    gfx_object_set_visible(obj, true);
 
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 
 error:
     return ret;
 }
 
 // Event handler functions
-static esp_err_t emote_handle_idle_event(emote_handle_t handle, const char *message)
+static gfx_err_t emote_handle_idle_event(emote_handle_t handle, const char *message)
 {
     (void)message;
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
     ret = emote_set_bat_status(handle);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set battery status");
+    if (ret != GFX_OK) {
+        GFX_LOGW(TAG, "Failed to set battery status");
     }
 
     ret = emote_set_label_clock(handle);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set clock label");
+    if (ret != GFX_OK) {
+        GFX_LOGW(TAG, "Failed to set clock label");
     }
 
-    return ESP_OK;
+    return GFX_OK;
 }
 
-static esp_err_t emote_handle_listen_event(emote_handle_t handle, const char *message)
+static gfx_err_t emote_handle_listen_event(emote_handle_t handle, const char *message)
 {
     (void)message;
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
     ret = emote_set_icon_animation(handle, EMOTE_DEF_OBJ_ANIM_LISTEN, EMOTE_ICON_LISTEN, 15, true);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set listen animation");
+    if (ret != GFX_OK) {
+        GFX_LOGW(TAG, "Failed to set listen animation");
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_MIC, true);
@@ -332,60 +333,60 @@ static esp_err_t emote_handle_listen_event(emote_handle_t handle, const char *me
     return ret;
 }
 
-static esp_err_t emote_handle_speak_event(emote_handle_t handle, const char *message)
+static gfx_err_t emote_handle_speak_event(emote_handle_t handle, const char *message)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
     ret = emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_TOAST, message);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set label text");
+    if (ret != GFX_OK) {
+        GFX_LOGW(TAG, "Failed to set label text");
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_SPEAKER, true);
 
-    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
+    gfx_object_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
-        gfx_emote_lock(handle->gfx_handle);
+        gfx_core_lock(handle->gfx_handle);
         gfx_label_set_snap_loop(obj, false);
-        gfx_emote_unlock(handle->gfx_handle);
+        gfx_core_unlock(handle->gfx_handle);
     }
 
     return ret;
 }
 
-static esp_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *message)
+static gfx_err_t emote_handle_sys_set_event(emote_handle_t handle, const char *message)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
     ret = emote_set_label_text(handle, EMOTE_DEF_OBJ_LABEL_TOAST, message);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set label text");
+    if (ret != GFX_OK) {
+        GFX_LOGW(TAG, "Failed to set label text");
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_TIPS, true);
 
-    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
+    gfx_object_t *obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_TOAST].obj;
     if (obj) {
-        gfx_emote_lock(handle->gfx_handle);
+        gfx_core_lock(handle->gfx_handle);
         gfx_label_set_snap_loop(obj, true);
-        gfx_emote_unlock(handle->gfx_handle);
+        gfx_core_unlock(handle->gfx_handle);
     }
 
     return ret;
 }
 
-static esp_err_t emote_handle_off_event(emote_handle_t handle, const char *message)
+static gfx_err_t emote_handle_off_event(emote_handle_t handle, const char *message)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
     // emote_set_eye_hidden(handle, true);
     return ret;
 }
 
-static esp_err_t emote_handle_bat_event(emote_handle_t handle, const char *message)
+static gfx_err_t emote_handle_bat_event(emote_handle_t handle, const char *message)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(message, ESP_ERR_INVALID_ARG, error, TAG, "Message is NULL");
+    GFX_GOTO_ON_FALSE(message, GFX_ERR_INVALID_ARG, error, TAG, "Message is NULL");
 
     // message format: "charging,percent" e.g. "1,75" or "0,30"
     char *comma_pos = strchr(message, ',');
@@ -394,7 +395,7 @@ static esp_err_t emote_handle_bat_event(emote_handle_t handle, const char *messa
         handle->bat_is_charging = (message[0] == '1');
         handle->bat_percent = (percent < 0) ? 0 : (percent > 100 ? 100 : percent);
     }
-    return ESP_OK;
+    return GFX_OK;
 
 error:
     return ret;
@@ -413,42 +414,42 @@ static void emote_dialog_timer_cb(void *data)
 
 // ===== Public Function Implementations =====
 
-esp_err_t emote_set_bat_status(emote_handle_t handle)
+gfx_err_t emote_set_bat_status(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     if (handle->bat_percent >= 0) {
         ret = emote_set_bat_status_label(handle);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to set battery label");
+        if (ret != GFX_OK) {
+            GFX_LOGW(TAG, "Failed to set battery label");
         }
 
         ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_STATUS, EMOTE_ICON_BATTERY_BG, true);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to set battery background icon");
+        if (ret != GFX_OK) {
+            GFX_LOGW(TAG, "Failed to set battery background icon");
         }
 
         ret = emote_set_bat_charge_icon(handle);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to set battery charge icon");
+        if (ret != GFX_OK) {
+            GFX_LOGW(TAG, "Failed to set battery charge icon");
         }
     }
-    return ESP_OK;
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-esp_err_t emote_set_bat_charge_icon(emote_handle_t handle)
+gfx_err_t emote_set_bat_charge_icon(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     if (handle->bat_percent < 0) {
-        return ESP_OK;
+        return GFX_OK;
     }
 
     ret = emote_set_icon_image(handle, EMOTE_DEF_OBJ_ICON_CHARGE, EMOTE_ICON_BATTERY_CHARGE, handle->bat_is_charging);
@@ -463,21 +464,21 @@ void emote_set_bat_status_charge(emote_handle_t handle)
         return;
     }
 
-    gfx_obj_t *obj = handle->def_objects[EMOTE_DEF_OBJ_ICON_CHARGE].obj;
+    gfx_object_t *obj = handle->def_objects[EMOTE_DEF_OBJ_ICON_CHARGE].obj;
     if (!obj) {
         return;
     }
 
-    gfx_emote_lock(handle->gfx_handle);
-    gfx_obj_set_visible(obj, handle->bat_is_charging);
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
+    gfx_object_set_visible(obj, handle->bat_is_charging);
+    gfx_core_unlock(handle->gfx_handle);
 }
 
-esp_err_t emote_set_bat_status_label(emote_handle_t handle)
+gfx_err_t emote_set_bat_status_label(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     if (handle->bat_percent >= 0) {
         char percent_str[16];
@@ -489,19 +490,19 @@ error:
     return ret;
 }
 
-esp_err_t emote_set_label_clock(emote_handle_t handle)
+gfx_err_t emote_set_label_clock(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
-    gfx_obj_t *obj = NULL;
+    gfx_err_t ret = GFX_OK;
+    gfx_object_t *obj = NULL;
     gfx_timer_handle_t timer = NULL;
 
-    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     obj = handle->def_objects[EMOTE_DEF_OBJ_LABEL_CLOCK].obj;
-    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "CLOCK_LABEL object not found");
+    GFX_GOTO_ON_FALSE(obj, GFX_ERR_INVALID_STATE, error, TAG, "CLOCK_LABEL object not found");
 
     timer = (gfx_timer_handle_t)handle->def_objects[EMOTE_DEF_OBJ_TIMER_STATUS].obj;
-    ESP_GOTO_ON_FALSE(timer, ESP_ERR_INVALID_STATE, error, TAG, "CLOCK_TIMER object not found");
+    GFX_GOTO_ON_FALSE(timer, GFX_ERR_INVALID_STATE, error, TAG, "CLOCK_TIMER object not found");
 
     time_t now;
     struct tm timeinfo;
@@ -511,68 +512,68 @@ esp_err_t emote_set_label_clock(emote_handle_t handle)
     char time_str[10];
     snprintf(time_str, sizeof(time_str), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     gfx_label_set_text(obj, time_str);
-    gfx_obj_set_visible(obj, true);
+    gfx_object_set_visible(obj, true);
 
     if (!gfx_timer_is_running(timer)) {
         gfx_timer_resume(timer);
     }
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-esp_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name)
+gfx_err_t emote_set_anim_emoji(emote_handle_t handle, const char *name)
 {
     if (!handle || !name) {
-        return ESP_ERR_INVALID_ARG;
+        return GFX_ERR_INVALID_ARG;
     }
 
     emote_set_eye_hidden(handle, false);
     return emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EYE, name);
 }
 
-esp_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name)
+gfx_err_t emote_set_dialog_anim(emote_handle_t handle, const char *name)
 {
     if (!handle || !name) {
-        return ESP_ERR_INVALID_ARG;
+        return GFX_ERR_INVALID_ARG;
     }
 
     emote_set_eye_hidden(handle, true);
     return emote_set_emoji_animation(handle, EMOTE_DEF_OBJ_ANIM_EMERG_DLG, name);
 }
 
-esp_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text)
+gfx_err_t emote_set_qrcode_data(emote_handle_t handle, const char *qrcode_text)
 {
-    esp_err_t ret = ESP_OK;
-    gfx_obj_t *obj = NULL;
+    gfx_err_t ret = GFX_OK;
+    gfx_object_t *obj = NULL;
 
-    ESP_LOGI(TAG, "set_qrcode_data: %s", qrcode_text);
-    ESP_GOTO_ON_FALSE(handle && qrcode_text, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_LOGI(TAG, "set_qrcode_data: %s", qrcode_text);
+    GFX_GOTO_ON_FALSE(handle && qrcode_text, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     obj = handle->def_objects[EMOTE_DEF_OBJ_QRCODE].obj;
-    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "QRCODE object not found");
+    GFX_GOTO_ON_FALSE(obj, GFX_ERR_INVALID_STATE, error, TAG, "QRCODE object not found");
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     gfx_qrcode_set_data(obj, qrcode_text);
-    gfx_obj_set_visible(obj, true);
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_object_set_visible(obj, true);
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-esp_err_t emote_stop_anim_dialog(emote_handle_t handle)
+gfx_err_t emote_stop_anim_dialog(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
 
     // Stop and delete timer if exists
     if (handle->dialog_timer) {
@@ -583,6 +584,10 @@ esp_err_t emote_stop_anim_dialog(emote_handle_t handle)
     SHOW_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EYE);
     HIDE_OBJ(handle, EMOTE_DEF_OBJ_ANIM_EMERG_DLG);
 
+    if (handle->emerg_dlg_done_event) {
+        (void)gfx_platform_event_set(handle->emerg_dlg_done_event, EMOTE_EMERG_DLG_DONE_BIT);
+    }
+
     emote_def_obj_entry_t *entry = &handle->def_objects[EMOTE_DEF_OBJ_ANIM_EMERG_DLG];
     if (entry->data.anim) {
         if (entry->data.anim->cache) {
@@ -591,89 +596,89 @@ esp_err_t emote_stop_anim_dialog(emote_handle_t handle)
         free(entry->data.anim);
         entry->data.anim = NULL;
     }
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-esp_err_t emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms)
+gfx_err_t emote_insert_anim_dialog(emote_handle_t handle, const char *name, uint32_t duration_ms)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
     gfx_timer_handle_t timer = NULL;
 
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle && name, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     // Reset semaphore before starting new animation
-    if (handle->emerg_dlg_done_sem) {
-        xSemaphoreTake(handle->emerg_dlg_done_sem, 0); // Clear semaphore if already set
+    if (handle->emerg_dlg_done_event) {
+        (void)gfx_platform_event_clear(handle->emerg_dlg_done_event, EMOTE_EMERG_DLG_DONE_BIT);
     }
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
     if (handle->dialog_timer) {
         gfx_timer_delete(handle->gfx_handle, handle->dialog_timer);
         handle->dialog_timer = NULL;
     }
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 
     ret = emote_set_dialog_anim(handle, name);
-    ESP_GOTO_ON_FALSE(ret == ESP_OK, ret, error, TAG, "Failed to set dialog animation");
+    GFX_GOTO_ON_FALSE(ret == GFX_OK, ret, error, TAG, "Failed to set dialog animation");
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
 
     timer = gfx_timer_create(handle->gfx_handle, emote_dialog_timer_cb, duration_ms, handle);
-    ESP_GOTO_ON_FALSE(timer, ESP_ERR_NO_MEM, error_unlock, TAG, "Failed to create dialog timer");
+    GFX_GOTO_ON_FALSE(timer, GFX_ERR_NO_MEM, error_unlock, TAG, "Failed to create dialog timer");
 
     gfx_timer_set_repeat_count(timer, 1);  // Execute only once
     handle->dialog_timer = timer;
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 
-    return ESP_OK;
+    return GFX_OK;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
     emote_stop_anim_dialog(handle);
 
 error:
     return ret;
 }
 
-esp_err_t emote_set_obj_visible(emote_handle_t handle, const char *name, bool visible)
+gfx_err_t emote_set_obj_visible(emote_handle_t handle, const char *name, bool visible)
 {
-    esp_err_t ret = ESP_OK;
-    gfx_obj_t *obj = NULL;
+    gfx_err_t ret = GFX_OK;
+    gfx_object_t *obj = NULL;
 
-    ESP_GOTO_ON_FALSE(handle && name, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle && name, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
     obj = emote_get_obj_by_name(handle, name);
-    ESP_GOTO_ON_FALSE(obj, ESP_ERR_INVALID_STATE, error, TAG, "Object not found");
+    GFX_GOTO_ON_FALSE(obj, GFX_ERR_INVALID_STATE, error, TAG, "Object not found");
 
-    gfx_emote_lock(handle->gfx_handle);
-    gfx_obj_set_visible(obj, visible);
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_core_lock(handle->gfx_handle);
+    gfx_object_set_visible(obj, visible);
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-esp_err_t emote_set_anim_visible(emote_handle_t handle, bool visible)
+gfx_err_t emote_set_anim_visible(emote_handle_t handle, bool visible)
 {
     emote_set_eye_hidden(handle, !visible);
-    return ESP_OK;
+    return GFX_OK;
 }
 
-esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message)
+gfx_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const char *message)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
     const emote_event_entry_t *entry = NULL;
 
-    ESP_GOTO_ON_FALSE(handle && event, ESP_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
+    GFX_GOTO_ON_FALSE(handle && event, GFX_ERR_INVALID_ARG, error, TAG, "Invalid parameters");
 
-    ESP_LOGD(TAG, "setEventMsg: %s, message: \"%s\"", event, message ? message : "");
+    GFX_LOGD(TAG, "setEventMsg: %s, message: \"%s\"", event, message ? message : "");
 
-    gfx_emote_lock(handle->gfx_handle);
+    gfx_core_lock(handle->gfx_handle);
 
     // Look up event handler in table
     for (size_t i = 0; i < EVENT_TABLE_SIZE; i++) {
@@ -683,7 +688,7 @@ esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const ch
         }
     }
 
-    ESP_GOTO_ON_FALSE(entry, ESP_ERR_NOT_FOUND, error_unlock, TAG, "Unhandled event: %s", event);
+    GFX_GOTO_ON_FALSE(entry, GFX_ERR_NOT_FOUND, error_unlock, TAG, "Unhandled event: %s", event);
 
     // Hide all UI elements for events that don't skip hiding
     if (!entry->skip_hide_ui) {
@@ -704,73 +709,73 @@ esp_err_t emote_set_event_msg(emote_handle_t handle, const char *event, const ch
     // Call event handler
     ret = entry->handler(handle, message);
 
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
     return ret;
 
 error_unlock:
-    gfx_emote_unlock(handle->gfx_handle);
+    gfx_core_unlock(handle->gfx_handle);
 
 error:
     return ret;
 }
 
-esp_err_t emote_notify_flush_finished(emote_handle_t handle)
+gfx_err_t emote_notify_flush_finished(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
+    GFX_GOTO_ON_FALSE(handle && handle->is_initialized, GFX_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_disp, ESP_ERR_INVALID_STATE, error, TAG, "GFX display handle not initialized");
+    GFX_GOTO_ON_FALSE(handle->gfx_disp, GFX_ERR_INVALID_STATE, error, TAG, "GFX display handle not initialized");
 
-    gfx_disp_flush_ready(handle->gfx_disp, true);
-    return ESP_OK;
+    gfx_display_flush_ready(handle->gfx_disp, true);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
-esp_err_t emote_notify_all_refresh(emote_handle_t handle)
+gfx_err_t emote_notify_all_refresh(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
+    GFX_GOTO_ON_FALSE(handle && handle->is_initialized, GFX_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_disp, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+    GFX_GOTO_ON_FALSE(handle->gfx_disp, GFX_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
 
-    gfx_disp_refresh_all(handle->gfx_disp);
-    return ESP_OK;
-
-error:
-    return ret;
-}
-
-
-esp_err_t emote_lock(emote_handle_t handle)
-{
-    esp_err_t ret = ESP_OK;
-
-    ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
-
-    ESP_GOTO_ON_FALSE(handle->gfx_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
-
-    gfx_emote_lock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_display_refresh_all(handle->gfx_disp);
+    return GFX_OK;
 
 error:
     return ret;
 }
 
 
-esp_err_t emote_unlock(emote_handle_t handle)
+gfx_err_t emote_lock(emote_handle_t handle)
 {
-    esp_err_t ret = ESP_OK;
+    gfx_err_t ret = GFX_OK;
 
-    ESP_GOTO_ON_FALSE(handle && handle->is_initialized, ESP_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
+    GFX_GOTO_ON_FALSE(handle && handle->is_initialized, GFX_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
 
-    ESP_GOTO_ON_FALSE(handle->gfx_handle, ESP_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+    GFX_GOTO_ON_FALSE(handle->gfx_handle, GFX_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
 
-    gfx_emote_unlock(handle->gfx_handle);
-    return ESP_OK;
+    gfx_core_lock(handle->gfx_handle);
+    return GFX_OK;
+
+error:
+    return ret;
+}
+
+
+gfx_err_t emote_unlock(emote_handle_t handle)
+{
+    gfx_err_t ret = GFX_OK;
+
+    GFX_GOTO_ON_FALSE(handle && handle->is_initialized, GFX_ERR_INVALID_STATE, error, TAG, "Handle not initialized");
+
+    GFX_GOTO_ON_FALSE(handle->gfx_handle, GFX_ERR_INVALID_STATE, error, TAG, "GFX handle not initialized");
+
+    gfx_core_unlock(handle->gfx_handle);
+    return GFX_OK;
 
 error:
     return ret;

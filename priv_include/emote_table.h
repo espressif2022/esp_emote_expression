@@ -7,7 +7,6 @@
 #pragma once
 
 #include "expression_emote.h"
-#include "esp_mmap_assets.h"
 #include "emote_defs.h"
 
 #ifdef __cplusplus
@@ -35,12 +34,17 @@ void emote_assets_table_destroy(assets_hash_table_t *ht);
 
 // ===== Asset Data Acquisition =====
 /**
- * @brief  Acquire asset data with caching support
+ * @brief  Acquire asset data with optional caller-owned cache.
+ *
+ * Behavior depends on mount mode (see emote_get_assets_addr_mode()):
+ * - EMOTE_ASSETS_ADDR_DIRECT: borrow flash-backed @p data_ref (no copy).
+ * - EMOTE_ASSETS_ADDR_COPY: borrow heap @p data_ref (no extra copy).
+ * When @p output_ptr is set, any previous *output_ptr buffer is freed first.
  *
  * @param[in]   handle        Emote handle
  * @param[in]   data_ref      Reference to data
  * @param[in]   size          Size of data
- * @param[out]  output_ptr    Output pointer to store cached data pointer
+ * @param[out]  output_ptr    Optional cache slot (freed/replaced when copy path runs)
  *
  * @return
  *       - Pointer to data  On success

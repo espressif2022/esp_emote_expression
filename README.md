@@ -281,6 +281,12 @@ The build function will automatically:
 **For detailed documentation on asset building, configuration, and build scripts, please refer to:**
 - [ESP Emote Assets Component Documentation](https://components.espressif.com/components/espressif2022/esp_emote_assets)
 
+## Host Simulation
+
+Desktop SDL simulation is supported via CMake (outside ESP-IDF). See
+[`simulation/README.md`](simulation/README.md) for dependencies, build, run, and
+smoke-test instructions.
+
 ## Custom Objects Example
 
 You can create and manage custom UI objects:
@@ -327,7 +333,12 @@ emote_unlock(handle);
 
 ## Examples
 
-For complete examples, please refer to the test applications in the `test_apps` directory. The test app demonstrates:
+For complete examples, please refer to:
+
+- **Device (ESP-IDF)**: test applications in the `test_apps` directory
+- **Host (SDL)**: [`simulation/README.md`](simulation/README.md)
+
+The test app demonstrates:
 
 - Basic emote operations (animations, events, QR codes)
 - Loading assets from partition (with/without memory mapping)

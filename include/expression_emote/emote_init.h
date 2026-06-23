@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "esp_err.h"
+#include "core/gfx_err.h"
 #include "gfx.h"
 
 #ifdef __cplusplus
@@ -38,7 +38,7 @@ typedef struct {
 
 // ===== FLUSH READY CALLBACK =====
 typedef void (*emote_flush_ready_cb_t)(int x_start, int y_start, int x_end, int y_end, const void *data, emote_handle_t manager);
-typedef void (*emote_update_cb_t)(gfx_disp_event_t event, const void *obj, emote_handle_t manager);
+typedef void (*emote_update_cb_t)(gfx_display_event_t event, const void *obj, emote_handle_t manager);
 
 typedef struct {
     struct {
@@ -61,9 +61,10 @@ typedef struct {
         int task_affinity;
         bool task_stack_in_ext;
     } task;
-    emote_flush_ready_cb_t flush_cb;  // Flush ready callback (can be NULL)
-    emote_update_cb_t update_cb;      // Update callback (can be NULL)
-    void *user_data;                  // User data (can be NULL)
+    gfx_backend_t *backend;               /**< Display backend (SDL on host, panel driver on device) */
+    emote_flush_ready_cb_t flush_cb;      /**< Flush ready callback (can be NULL) */
+    emote_update_cb_t update_cb;          /**< Update callback (can be NULL) */
+    void *user_data;                      /**< User data (can be NULL) */
 } emote_config_t;
 
 // ===== API FUNCTIONS =====
