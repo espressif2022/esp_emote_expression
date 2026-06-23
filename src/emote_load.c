@@ -10,6 +10,9 @@
 #include "common/gfx_log_priv.h"
 #include <string.h>
 #include <stdlib.h>
+#if GFX_HOST_BUILD
+#include <sys/stat.h>
+#endif
 
 #include "expression_emote.h"
 
@@ -74,6 +77,19 @@ static bool emote_acquire_needs_cache_copy(emote_handle_t handle, const void *da
     /* DIRECT mmap: borrow flash pointers; legacy pack offsets still need a copy. */
     return emote_data_ref_is_pack_offset(data_ref);
 }
+
+#if GFX_HOST_BUILD
+static gfx_fs_source_type_t emote_host_path_source_type(const char *path)
+{
+    struct stat st;
+
+    if (path != NULL && stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+        return GFX_FS_SOURCE_PACK_FILE;
+    }
+
+    return GFX_FS_SOURCE_DIR;
+}
+#endif
 
 static void emote_clear_asset_blobs(emote_handle_t handle)
 {
@@ -351,7 +367,7 @@ gfx_err_t emote_mount_assets(emote_handle_t handle, const emote_data_t *data)
 
     if (data->type == EMOTE_SOURCE_PATH) {
 #if GFX_HOST_BUILD
-        const gfx_fs_source_type_t source_type = GFX_FS_SOURCE_DIR;
+        const gfx_fs_source_type_t source_type = emote_host_path_source_type(data->source.path);
 #else
         const gfx_fs_source_type_t source_type = GFX_FS_SOURCE_PACK_FILE;
 #endif
